@@ -4,6 +4,7 @@ import com.isums.scheduleservice.domains.enums.LeaveRequestStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -17,8 +18,7 @@ import java.util.UUID;
                 @Index(name = "idx_leave_status", columnList = "status")
         }
 )
-@Getter
-@Setter
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
@@ -53,8 +53,8 @@ public class LeaveRequest {
     private String decisionNote;
 
     @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 
     @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
+    private Instant updatedAt;
 }

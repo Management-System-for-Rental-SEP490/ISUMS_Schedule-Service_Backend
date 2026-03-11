@@ -3,6 +3,7 @@ package com.isums.scheduleservice.domains.entities;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -16,8 +17,7 @@ import java.util.UUID;
                 @Index(name = "idx_leave_history_date", columnList = "leave_date")
         }
 )
-@Getter
-@Setter
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
@@ -43,5 +43,5 @@ public class LeaveHistory {
     private UUID approvedByManagerId;
 
     @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 }

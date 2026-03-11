@@ -12,14 +12,18 @@ import java.util.UUID;
 @Table(
         name = "work_slots",
         indexes = {
-                @Index(name = "idx_slot_staff_date", columnList = "staff_id,work_date"),
-                @Index(name = "idx_slot_region", columnList = "region_id"),
-                @Index(name = "idx_slot_ticket", columnList = "ticket_id"),
-                @Index(name = "idx_slot_status", columnList = "status")
+                @Index(name = "idx_staff_date", columnList = "staff_id,start_time"),
+                @Index(name = "idx_ticket", columnList = "ticket_id"),
+                @Index(name = "idx_status", columnList = "status")
+        },
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_staff_start_time",
+                        columnNames = {"staff_id","start_time"}
+                )
         }
 )
-@Getter
-@Setter
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
@@ -29,17 +33,8 @@ public class WorkSlot {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(name = "weekly_schedule_id", nullable = false)
-    private UUID weeklyScheduleId;
-
     @Column(name = "staff_id", nullable = false)
     private UUID staffId;
-
-    @Column(name = "region_id", nullable = false)
-    private UUID regionId;
-
-    @Column(name = "work_date", nullable = false)
-    private LocalDate workDate;
 
     @Column(name = "start_time", nullable = false)
     private LocalDateTime startTime;
@@ -55,13 +50,4 @@ public class WorkSlot {
     @Column(name = "ticket_id")
     private UUID ticketId;
 
-    // ETA tracking
-    @Column(name = "last_eta_minutes")
-    private Integer lastEtaMinutes;
-
-    @Column(name = "last_eta_updated_at")
-    private LocalDateTime lastEtaUpdatedAt;
-
-    @Column(name = "buffer_minutes", nullable = false)
-    private Integer bufferMinutes;
 }

@@ -3,6 +3,7 @@ package com.isums.scheduleservice.domains.entities;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -15,8 +16,7 @@ import java.util.UUID;
                 @Index(name = "idx_workload_month", columnList = "month_key")
         }
 )
-@Getter
-@Setter
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
@@ -43,5 +43,5 @@ public class StaffWorkloadMonthly {
     private Integer activeJobs;
 
     @Column(name = "updated_at", nullable = false)
-    private LocalDateTime updatedAt;
+    private Instant updatedAt;
 }
