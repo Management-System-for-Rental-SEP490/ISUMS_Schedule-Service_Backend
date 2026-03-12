@@ -10,14 +10,14 @@ import com.isums.scheduleservice.infrastructures.repositories.ScheduleTemplateRe
 import com.isums.scheduleservice.infrastructures.repositories.WorkSlotRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
+import java.time.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+@Transactional
 @Service
 @RequiredArgsConstructor
 public class WorkSlotServiceImpl implements WorkSlotService {
@@ -25,135 +25,59 @@ public class WorkSlotServiceImpl implements WorkSlotService {
     private final ScheduleTemplateRepository scheduleTemplateRepository;
     private final ScheduleMapper scheduleMapper;
 
+
     @Override
     public WorkSlotDto createSlots(CreateWorkSlotRequest req) {
         try{
-            ScheduleTemplate template = scheduleTemplateRepository.findEffectiveTemplates(req.date())
-                    .orElseThrow(() -> new RuntimeException("Template not found"));;
+            ScheduleTemplate template = scheduleTemplateRepository.findFirstByEffectiveFromLessThanEqualOrderByEffectiveFromDesc(req.startTime().toLocalDate())
+                    .orElseThrow(() -> new RuntimeException("Current template not found"));
+            LocalDateTime endTime = req.startTime().plusMinutes(template.getSlotMinutes());
 
-            List<WorkSlot> allSlots =new ArrayList<>();
-            List<SlotPattern> patterns = generatePattern(template);
+            validateWorkingHours(req.startTime(),endTime,template);
 
-            for(int i = 0; i < req.days(); i++){
+            List<WorkSlot> conflicts = workSlotRepository.findOverlappingSlots(req.staffId(),req.startTime(),endTime);
 
-                LocalDate date = req.date().plusDays(i);
-
-                // step 3: clone pattern for each staff
-                for(UUID staffId : req.staffIds()){
-
-                    allSlots.addAll(
-                            createSlotsFromPattern(staffId, date, patterns)
-                    );
-
-                }
+            if(!conflicts.isEmpty()){
+                throw new RuntimeException("Staff already has job in this time");
             }
 
-
-            workSlotRepository.saveAll(allSlots);
-            List<SlotTimeDto> slots = allSlots.stream()
-                    .map(s -> new SlotTimeDto(
-                            s.getStaffId(),
-                            s.getStartTime(),
-                            s.getEndTime(),
-                            s.getStatus().name()
-                    ))
-                    .toList();
-            return new WorkSlotDto(allSlots.size(),slots);
-
-        } catch (Exception ex) {
-            throw new RuntimeException("Can't create slot" + ex.getMessage());
-        }
-    }
-
-    @Override
-    public List<SlotDto> getAllWorkSlots() {
-        try{
-            List<WorkSlot> slots = workSlotRepository.findAllByOrderByStartTimeAsc();
-
-            return scheduleMapper.slots(slots);
-
-        }catch (Exception ex){
-            throw new RuntimeException("Can't get all slots" + ex.getMessage());
-        }
-    }
-
-    @Override
-    public List<SlotDto> getWorkSlotsByStaff(UUID staffId) {
-        try{
-            List<WorkSlot> slots = workSlotRepository.findByStaffIdOrderByStartTimeAsc(staffId);
-
-            return scheduleMapper.slots(slots);
-
-        }catch (Exception ex){
-            throw new RuntimeException("Can't get all slots" + ex.getMessage());
-        }
-    }
-
-    private List<SlotPattern> generatePattern(ScheduleTemplate template){
-
-        List<SlotPattern> patterns = new ArrayList<>();
-
-        LocalTime cursor = template.getOpenTime();
-
-        // morning
-        while(!cursor.plusMinutes(template.getSlotMinutes())
-                .isAfter(template.getBreakStart())){
-
-            patterns.add(new SlotPattern(
-                    cursor,
-                    cursor.plusMinutes(template.getSlotMinutes())
-            ));
-
-            cursor = cursor.plusMinutes(
-                    template.getSlotMinutes() + template.getBufferMinutes()
-            );
-        }
-
-        cursor = template.getBreakEnd();
-
-        // afternoon
-        while(!cursor.plusMinutes(template.getSlotMinutes())
-                .isAfter(template.getCloseTime())){
-
-            patterns.add(new SlotPattern(
-                    cursor,
-                    cursor.plusMinutes(template.getSlotMinutes())
-            ));
-
-            cursor = cursor.plusMinutes(
-                    template.getSlotMinutes() + template.getBufferMinutes()
-            );
-        }
-
-        return patterns;
-    }
-
-    private List<WorkSlot> createSlotsFromPattern(
-
-            UUID staffId,
-            LocalDate date,
-            List<SlotPattern> patterns
-
-    ){
-
-        List<WorkSlot> slots = new ArrayList<>();
-
-        for(SlotPattern p : patterns){
-
-            LocalDateTime start = LocalDateTime.of(date, p.start());
-
             WorkSlot slot = WorkSlot.builder()
-                    .staffId(staffId)
-                    .startTime(start)
-                    .endTime(LocalDateTime.of(date, p.end()))
-                    .status(SlotStatus.AVAILABLE)
+                    .staffId(req.staffId())
+                    .jobId(req.jobId())
+                    .jobType(req.jobType())
+                    .startTime((req.startTime()))
+                    .endTime((endTime))
+                    .status(SlotStatus.BOOKED)
+                    .createdAt(Instant.now())
                     .build();
 
-            slots.add(slot);
-        }
+            workSlotRepository.save(slot);
 
-        return slots;
+            return scheduleMapper.slot(slot);
+        } catch (Exception ex) {
+            throw new RuntimeException("Can't create work slot" + ex.getMessage());
+        }
+    }
+
+    private void validateWorkingHours(LocalDateTime start,LocalDateTime end ,ScheduleTemplate template){
+        LocalTime startTime = start.toLocalTime();
+        LocalTime endTime = end.toLocalTime();
+
+        boolean isMorning = !startTime.isBefore(template.getOpenTime())
+                && !endTime.isAfter(template.getBreakStart());
+
+        boolean isAfternoon = !startTime.isBefore(template.getBreakEnd())
+                && !endTime.isAfter(template.getCloseTime());
+
+        DayOfWeek day = start.getDayOfWeek();
+        String shortenDay = day.name().substring(0,3);
+
+        if(!template.getWorkingDays().contains(shortenDay)){
+            throw new RuntimeException("Not a working day");
+        }
+        if(!isMorning && !isAfternoon){
+            throw new RuntimeException("Outside working hours");
+        }
     }
 }
-
 

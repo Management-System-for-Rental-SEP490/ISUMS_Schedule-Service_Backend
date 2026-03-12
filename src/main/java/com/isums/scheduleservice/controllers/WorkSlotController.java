@@ -14,22 +14,10 @@ import java.util.UUID;
 public class WorkSlotController {
     private final WorkSlotService workSlotService;
 
-    @PostMapping("/create")
-    public ApiResponse<WorkSlotDto> createSlots(@RequestBody CreateWorkSlotRequest request
-    ) {
+    @PostMapping
+    public ApiResponse<WorkSlotDto> createSlots(@RequestBody CreateWorkSlotRequest request) {
         WorkSlotDto res = workSlotService.createSlots(request);
         return ApiResponses.created(res,"Create slots successfully");
     }
 
-    @GetMapping
-    public ApiResponse<List<SlotDto>> getAllSlots(){
-        List<SlotDto> res = workSlotService.getAllWorkSlots();
-        return ApiResponses.ok(res,"get all slots successfully");
-    }
-
-    @GetMapping("/staff/{staffId}")
-    public ApiResponse<List<SlotDto>> getSlotsByStaff(@PathVariable UUID staffId){
-        List<SlotDto> res = workSlotService.getWorkSlotsByStaff(staffId);
-        return ApiResponses.ok(res,"get all slots by staff successfully");
-    }
 }

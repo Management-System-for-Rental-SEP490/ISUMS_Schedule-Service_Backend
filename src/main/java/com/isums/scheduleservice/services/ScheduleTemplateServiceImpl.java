@@ -57,7 +57,7 @@ public class ScheduleTemplateServiceImpl implements ScheduleTemplateService {
     @Override
     public ScheduleTemplateDto getCurrentTemplate(LocalDate date) {
         try{
-            ScheduleTemplate template = scheduleTemplateRepository.findEffectiveTemplates(date)
+            ScheduleTemplate template = scheduleTemplateRepository.findFirstByEffectiveFromLessThanEqualOrderByEffectiveFromDesc(date)
                     .orElseThrow(() -> new RuntimeException("schedule not found"));
 
             return scheduleMapper.schedule(template);
