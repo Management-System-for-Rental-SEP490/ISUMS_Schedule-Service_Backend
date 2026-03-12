@@ -28,16 +28,16 @@ public class WorkSlotServiceImpl implements WorkSlotService {
 
     @Override
     public WorkSlotDto createSlots(CreateWorkSlotRequest req) {
-        try{
+        try {
             ScheduleTemplate template = scheduleTemplateRepository.findFirstByEffectiveFromLessThanEqualOrderByEffectiveFromDesc(req.startTime().toLocalDate())
                     .orElseThrow(() -> new RuntimeException("Current template not found"));
             LocalDateTime endTime = req.startTime().plusMinutes(template.getSlotMinutes());
 
-            validateWorkingHours(req.startTime(),endTime,template);
+            validateWorkingHours(req.startTime(), endTime, template);
 
-            List<WorkSlot> conflicts = workSlotRepository.findOverlappingSlots(req.staffId(),req.startTime(),endTime);
+            List<WorkSlot> conflicts = workSlotRepository.findOverlappingSlots(req.staffId(), req.startTime(), endTime);
 
-            if(!conflicts.isEmpty()){
+            if (!conflicts.isEmpty()) {
                 throw new RuntimeException("Staff already has job in this time");
             }
 
@@ -58,6 +58,51 @@ public class WorkSlotServiceImpl implements WorkSlotService {
             throw new RuntimeException("Can't create work slot" + ex.getMessage());
         }
     }
+
+    @Override
+    public List<WorkSlotDto> getSlotsByStaffId(UUID staffId) {
+        try {
+            List<WorkSlot> slots = workSlotRepository.findByStaffIdOrderByStartTimeAsc(staffId);
+
+            return scheduleMapper.slots(slots);
+        } catch (Exception ex) {
+            throw new RuntimeException("Can't get work slot " + ex.getMessage());
+        }
+    }
+
+    @Override
+    public List<WorkSlotDto> getSlotsByDate(LocalDate date) {
+        try {
+            LocalDateTime start = date.atStartOfDay();
+            LocalDateTime end = date.atTime(LocalTime.MAX);
+
+            List<WorkSlot> slots = workSlotRepository.findByStartTimeBetweenOrderByStartTimeAsc(start, end);
+
+            return scheduleMapper.slots(slots);
+        } catch (Exception ex) {
+            throw new RuntimeException("Can't get work slot " + ex.getMessage());
+        }
+    }
+
+    @Override
+    public Boolean cancelSlot(UUID slotId) {
+        try {
+            WorkSlot slot = workSlotRepository.findById(slotId)
+                    .orElseThrow(() -> new IllegalArgumentException("Slot not found"));
+
+            if (slot.getStatus() == SlotStatus.CANCELLED) {
+                throw new IllegalArgumentException("Slot already cancelled");
+            }
+
+            slot.setStatus(SlotStatus.CANCELLED);
+
+            workSlotRepository.save(slot);
+            return true;
+        } catch (Exception ex) {
+            throw new RuntimeException("Can't update status work slot " + ex.getMessage());
+        }
+    }
+
 
     private void validateWorkingHours(LocalDateTime start,LocalDateTime end ,ScheduleTemplate template){
         LocalTime startTime = start.toLocalTime();
