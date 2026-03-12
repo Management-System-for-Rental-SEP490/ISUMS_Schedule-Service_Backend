@@ -10,15 +10,13 @@ import java.util.UUID;
 
 public interface WorkSlotRepository extends JpaRepository<WorkSlot, UUID> {
     @Query("""
-        SELECT w FROM WorkSlot w
-        WHERE w.staffId = :staffId
-        AND w.startTime < :endTime
-        AND w.endTime > :startTime
+    SELECT w FROM WorkSlot w
+    WHERE w.staffId = :staffId
+    AND w.status = 'BOOKED'
+    AND w.startTime < :end
+    AND w.endTime > :start
     """)
-    List<WorkSlot> findOverlappingSlots(
-            UUID staffId,
-            LocalDateTime startTime,
-            LocalDateTime endTime
-    );
-
+    List<WorkSlot> findOverlappingSlots(UUID staffId, LocalDateTime startTime, LocalDateTime endTime);
+    List<WorkSlot> findByStaffIdOrderByStartTimeAsc(UUID staffId);
+    List<WorkSlot> findByStartTimeBetweenOrderByStartTimeAsc(LocalDateTime start, LocalDateTime end);
 }

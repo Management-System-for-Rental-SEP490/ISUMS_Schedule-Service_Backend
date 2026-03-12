@@ -15,7 +15,5 @@ public record WorkSlotDto(
         LocalDateTime startTime,
         LocalDateTime endTime,
         SlotStatus status
-
-
 ) {
 }
