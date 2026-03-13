@@ -16,7 +16,7 @@ public interface WorkSlotRepository extends JpaRepository<WorkSlot, UUID> {
     AND w.startTime < :end
     AND w.endTime > :start
     """)
-    List<WorkSlot> findOverlappingSlots(UUID staffId, LocalDateTime startTime, LocalDateTime endTime);
+    List<WorkSlot> findOverlappingSlots(UUID staffId, LocalDateTime start, LocalDateTime end);
     List<WorkSlot> findByStaffIdOrderByStartTimeAsc(UUID staffId);
     List<WorkSlot> findByStartTimeBetweenOrderByStartTimeAsc(LocalDateTime start, LocalDateTime end);
 }
