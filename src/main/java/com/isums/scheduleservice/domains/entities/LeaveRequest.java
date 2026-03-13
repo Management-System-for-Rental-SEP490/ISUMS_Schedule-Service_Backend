@@ -14,8 +14,13 @@ import java.util.UUID;
         name = "leave_requests",
         indexes = {
                 @Index(name = "idx_leave_staff", columnList = "staff_id"),
-                @Index(name = "idx_leave_region", columnList = "region_id"),
                 @Index(name = "idx_leave_status", columnList = "status")
+        },
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_staff_leave_date",
+                        columnNames = {"staff_id", "leave_date"}
+                )
         }
 )
 @Data
@@ -30,9 +35,6 @@ public class LeaveRequest {
 
     @Column(name = "staff_id", nullable = false)
     private UUID staffId;
-
-    @Column(name = "region_id", nullable = false)
-    private UUID regionId;
 
     // nghỉ theo ngày (dạng MVP)
     @Column(name = "leave_date", nullable = false)
