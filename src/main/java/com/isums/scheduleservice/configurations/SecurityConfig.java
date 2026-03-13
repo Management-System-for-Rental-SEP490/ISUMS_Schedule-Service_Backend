@@ -14,10 +14,21 @@ public class SecurityConfig {
         return http
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/actuator/prometheus").permitAll()
+                        .requestMatchers(
+                                "/actuator/prometheus",
+                                "/api/schedules/v3/api-docs",
+                                "/api/schedules/v3/api-docs/**",
+                                "/api/schedules/swagger",
+                                "/api/schedules/swagger/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html",
+                                "/v3/api-docs",
+                                "/v3/api-docs/**"
+                        ).permitAll()
                         .anyRequest().authenticated()
                 )
-                .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> {}))
+                .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> {
+                }))
                 .build();
     }
 }
