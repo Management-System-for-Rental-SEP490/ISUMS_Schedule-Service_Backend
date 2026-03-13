@@ -13,7 +13,6 @@ import java.util.UUID;
         name = "leave_histories",
         indexes = {
                 @Index(name = "idx_leave_history_staff", columnList = "staff_id"),
-                @Index(name = "idx_leave_history_region", columnList = "region_id"),
                 @Index(name = "idx_leave_history_date", columnList = "leave_date")
         }
 )
@@ -33,8 +32,6 @@ public class LeaveHistory {
     @Column(name = "staff_id", nullable = false)
     private UUID staffId;
 
-    @Column(name = "region_id", nullable = false)
-    private UUID regionId;
 
     @Column(name = "leave_date", nullable = false)
     private LocalDate leaveDate;
