@@ -4,7 +4,9 @@ import com.isums.scheduleservice.domains.dtos.*;
 import com.isums.scheduleservice.domains.entities.ScheduleTemplate;
 import com.isums.scheduleservice.domains.entities.WorkSlot;
 import com.isums.scheduleservice.domains.enums.SlotStatus;
+import com.isums.scheduleservice.domains.events.JobScheduledEvent;
 import com.isums.scheduleservice.infrastructures.abstracts.WorkSlotService;
+import com.isums.scheduleservice.infrastructures.kafka.JobEventProducer;
 import com.isums.scheduleservice.infrastructures.mapper.ScheduleMapper;
 import com.isums.scheduleservice.infrastructures.repositories.ScheduleTemplateRepository;
 import com.isums.scheduleservice.infrastructures.repositories.WorkSlotRepository;
@@ -24,6 +26,7 @@ public class WorkSlotServiceImpl implements WorkSlotService {
     private final WorkSlotRepository workSlotRepository;
     private final ScheduleTemplateRepository scheduleTemplateRepository;
     private final ScheduleMapper scheduleMapper;
+    private final JobEventProducer jobEventProducer;
 
 
     @Override
@@ -52,6 +55,16 @@ public class WorkSlotServiceImpl implements WorkSlotService {
                     .build();
 
             workSlotRepository.save(slot);
+
+            JobScheduledEvent event = new JobScheduledEvent();
+            event.setJobId(req.jobId());
+            event.setJobType(req.jobType().name());
+            event.setSlotId(slot.getId());
+            event.setStaffId(slot.getStaffId());
+            event.setStartTime(slot.getStartTime());
+            event.setEndTime(slot.getEndTime());
+
+            jobEventProducer.publishJobScheduled(event);
 
             return scheduleMapper.slot(slot);
         } catch (Exception ex) {

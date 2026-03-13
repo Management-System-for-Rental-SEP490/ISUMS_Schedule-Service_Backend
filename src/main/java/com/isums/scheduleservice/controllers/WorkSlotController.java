@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("api/schedules/work_slots")
+@RequestMapping("/api/schedules/work_slots")
 @RequiredArgsConstructor
 public class WorkSlotController {
     private final WorkSlotService workSlotService;
