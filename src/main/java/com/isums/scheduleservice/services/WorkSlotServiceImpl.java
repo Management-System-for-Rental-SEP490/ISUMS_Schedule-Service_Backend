@@ -4,6 +4,7 @@ import com.isums.scheduleservice.domains.dtos.*;
 import com.isums.scheduleservice.domains.entities.ScheduleTemplate;
 import com.isums.scheduleservice.domains.entities.WorkSlot;
 import com.isums.scheduleservice.domains.enums.SlotStatus;
+import com.isums.scheduleservice.domains.events.JobRescheduledEvent;
 import com.isums.scheduleservice.domains.events.JobScheduledEvent;
 import com.isums.scheduleservice.infrastructures.abstracts.WorkSlotService;
 import com.isums.scheduleservice.infrastructures.kafka.JobEventProducer;
@@ -56,15 +57,17 @@ public class WorkSlotServiceImpl implements WorkSlotService {
 
             workSlotRepository.save(slot);
 
-            JobScheduledEvent event = new JobScheduledEvent();
-            event.setJobId(req.jobId());
-            event.setJobType(req.jobType().name());
-            event.setSlotId(slot.getId());
-            event.setStaffId(slot.getStaffId());
-            event.setStartTime(slot.getStartTime());
-            event.setEndTime(slot.getEndTime());
+                JobScheduledEvent event = new JobScheduledEvent();
+                event.setJobId(req.jobId());
+                event.setJobType(req.jobType().name());
+                event.setSlotId(slot.getId());
+                event.setStaffId(slot.getStaffId());
+                event.setStartTime(slot.getStartTime());
+                event.setEndTime(slot.getEndTime());
 
-            jobEventProducer.publishJobScheduled(event);
+                jobEventProducer.publishJobScheduled(event);
+
+
 
             return scheduleMapper.slot(slot);
         } catch (Exception ex) {
@@ -113,6 +116,63 @@ public class WorkSlotServiceImpl implements WorkSlotService {
             return true;
         } catch (Exception ex) {
             throw new RuntimeException("Can't update status work slot " + ex.getMessage());
+        }
+    }
+
+    @Override
+    public WorkSlotDto rescheduleSlot(RescheduleSlotRequest request) {
+        try{
+            WorkSlot oldSlot = workSlotRepository.findByJobIdAndStatus(request.jobId(),SlotStatus.NEED_RESCHEDULE)
+                    .stream()
+                    .findFirst()
+                    .orElseThrow(() -> new RuntimeException("No slot need reschedule"));
+
+            ScheduleTemplate template = scheduleTemplateRepository.findFirstByEffectiveFromLessThanEqualOrderByEffectiveFromDesc(request.newStartTime().toLocalDate())
+                    .orElseThrow(() -> new RuntimeException("Current template not found"));
+
+            LocalDateTime endTime = request.newStartTime().plusMinutes(template.getSlotMinutes());
+            validateWorkingHours(request.newStartTime(),endTime,template);
+
+            List<WorkSlot> conflicts =
+                    workSlotRepository.findOverlappingSlots(
+                            request.newStaffId(),
+                            request.newStartTime(),
+                            endTime
+                    );
+
+            if(!conflicts.isEmpty()){
+                throw new RuntimeException("Staff already has job in this time");
+            }
+
+            WorkSlot newSlot = WorkSlot.builder()
+                            .staffId(request.newStaffId())
+                            .jobId(request.jobId())
+                            .jobType(request.jobType())
+                            .startTime(request.newStartTime())
+                            .endTime(endTime)
+                            .status(SlotStatus.BOOKED)
+                            .createdAt(Instant.now())
+                            .build();
+
+            workSlotRepository.save(newSlot);
+
+            oldSlot.setStatus(SlotStatus.CANCELLED);
+            workSlotRepository.save(oldSlot);
+
+            JobRescheduledEvent event = new JobRescheduledEvent();
+            event.setJobId(request.jobId());
+            event.setJobType(request.jobType().name());
+            event.setSlotId(newSlot.getId());
+            event.setStaffId(newSlot.getStaffId());
+            event.setStartTime(newSlot.getStartTime());
+            event.setEndTime(newSlot.getEndTime());
+
+            jobEventProducer.publishJobRescheduled(event);
+
+            return scheduleMapper.slot(newSlot);
+
+        }catch (Exception ex){
+            throw new RuntimeException("Can't reschedule slot " + ex.getMessage());
         }
     }
 
