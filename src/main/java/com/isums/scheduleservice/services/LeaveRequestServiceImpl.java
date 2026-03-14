@@ -8,7 +8,9 @@ import com.isums.scheduleservice.domains.entities.LeaveRequest;
 import com.isums.scheduleservice.domains.entities.WorkSlot;
 import com.isums.scheduleservice.domains.enums.LeaveRequestStatus;
 import com.isums.scheduleservice.domains.enums.SlotStatus;
+import com.isums.scheduleservice.domains.events.JobNeedRescheduleEvent;
 import com.isums.scheduleservice.infrastructures.abstracts.LeaveRequestService;
+import com.isums.scheduleservice.infrastructures.kafka.JobEventProducer;
 import com.isums.scheduleservice.infrastructures.mapper.LeaveMapper;
 import com.isums.scheduleservice.infrastructures.repositories.LeaveHistoryRepository;
 import com.isums.scheduleservice.infrastructures.repositories.LeaveRequestRepository;
@@ -29,6 +31,8 @@ public class LeaveRequestServiceImpl implements LeaveRequestService {
     private final LeaveRequestRepository leaveRequestRepository;
     private final LeaveMapper leaveMapper;
     private final WorkSlotRepository workSlotRepository;
+    private final JobEventProducer jobEventProducer;
+
 
     @Override
     public LeaveRequestDto createLeaveRequest(CreateLeaveRequest req) {
@@ -83,6 +87,14 @@ public class LeaveRequestServiceImpl implements LeaveRequestService {
         for(WorkSlot slot : slots){
             if(slot.getStatus() == SlotStatus.BOOKED){
                 slot.setStatus(SlotStatus.NEED_RESCHEDULE);
+
+                JobNeedRescheduleEvent event = new JobNeedRescheduleEvent();
+                event.setJobId(slot.getJobId());
+                event.setJobType(slot.getJobType().name());
+                event.setSlotId(slot.getId());
+
+                jobEventProducer.publishJobNeedReschedule(event);
+
             }else{
                 slot.setStatus(SlotStatus.BLOCKED);
             }

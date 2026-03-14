@@ -21,6 +21,12 @@ public class WorkSlotController {
         return ApiResponses.created(res,"Create slots successfully");
     }
 
+    @PostMapping("/reschedule")
+    public ApiResponse<WorkSlotDto> rescheduleSlot(@RequestBody RescheduleSlotRequest request){
+        WorkSlotDto res = workSlotService.rescheduleSlot(request);
+        return ApiResponses.ok(res,"Reschedule job successfully");
+    }
+
     @GetMapping("/staff/{staffId}")
     public ApiResponse<List<WorkSlotDto>> getSlotsByStaff(@PathVariable UUID staffId){
         List<WorkSlotDto> res = workSlotService.getSlotsByStaffId(staffId);

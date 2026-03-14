@@ -5,17 +5,13 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
 import java.util.UUID;
+
 
 @NoArgsConstructor
 @AllArgsConstructor
-public class JobScheduledEvent extends JobEvent{
+public class JobNeedRescheduleEvent extends JobEvent {
     private UUID jobId;
     private String jobType;
     private UUID slotId;
-    private UUID staffId;
-    private LocalDateTime startTime;
-    private LocalDateTime endTime;
-
 }

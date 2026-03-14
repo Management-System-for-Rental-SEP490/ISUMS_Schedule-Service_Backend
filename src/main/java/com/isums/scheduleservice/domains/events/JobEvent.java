@@ -8,14 +8,20 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class JobScheduledEvent extends JobEvent{
+@Builder
+public class JobEvent {
     private UUID jobId;
-    private String jobType;
-    private UUID slotId;
-    private UUID staffId;
-    private LocalDateTime startTime;
-    private LocalDateTime endTime;
 
+    private UUID slotId;
+
+    private UUID staffId;
+
+    private String jobType;
+
+    private LocalDateTime startTime;
+
+    private LocalDateTime endTime;
 }
