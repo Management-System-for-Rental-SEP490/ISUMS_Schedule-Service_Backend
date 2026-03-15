@@ -86,19 +86,19 @@ public class WorkSlotServiceImpl implements WorkSlotService {
         }
     }
 
-    @Override
-    public List<WorkSlotDto> getSlotsByDate(LocalDate date) {
-        try {
-            LocalDateTime start = date.atStartOfDay();
-            LocalDateTime end = date.atTime(LocalTime.MAX);
-
-            List<WorkSlot> slots = workSlotRepository.findByStartTimeBetweenOrderByStartTimeAsc(start, end);
-
-            return scheduleMapper.slots(slots);
-        } catch (Exception ex) {
-            throw new RuntimeException("Can't get work slot " + ex.getMessage());
-        }
-    }
+//    @Override
+//    public List<WorkSlotDto> getSlotsByDate(LocalDate date) {
+//        try {
+//            LocalDateTime start = date.atStartOfDay();
+//            LocalDateTime end = date.atTime(LocalTime.MAX);
+//
+//            List<WorkSlot> slots = workSlotRepository.findByStartTimeBetweenOrderByStartTimeAsc(start, end);
+//
+//            return scheduleMapper.slots(slots);
+//        } catch (Exception ex) {
+//            throw new RuntimeException("Can't get work slot " + ex.getMessage());
+//        }
+//    }
 
     @Override
     public Boolean cancelSlot(UUID slotId) {
@@ -173,6 +173,26 @@ public class WorkSlotServiceImpl implements WorkSlotService {
 
         }catch (Exception ex){
             throw new RuntimeException("Can't reschedule slot " + ex.getMessage());
+        }
+    }
+
+    @Override
+    public List<WorkSlotDto> getSlotsByRange(LocalDate start, LocalDate end) {
+        try{
+            if (start.isAfter(end)) {
+                throw new RuntimeException("Start date must be before end date");
+            }
+
+            LocalDateTime startTime = start.atStartOfDay();
+
+            LocalDateTime endTime = end.plusDays(1).atStartOfDay();
+
+            List<WorkSlot> slots = workSlotRepository.findByStartTimeBetweenOrderByStartTimeAsc(startTime,endTime);
+
+            return scheduleMapper.slots(slots);
+
+        }catch (Exception ex){
+            throw new RuntimeException("Can't get all slot in range " + ex.getMessage());
         }
     }
 

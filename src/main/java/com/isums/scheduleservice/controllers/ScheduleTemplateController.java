@@ -35,4 +35,5 @@ public class ScheduleTemplateController {
         ScheduleTemplateDto res = scheduleTemplateService.getCurrentTemplate(date);
         return ApiResponses.ok(res,"Get current template");
     }
+
 }
