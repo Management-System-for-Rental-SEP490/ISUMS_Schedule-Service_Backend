@@ -33,6 +33,7 @@ public class LeaveRequestServiceImpl implements LeaveRequestService {
     private final WorkSlotRepository workSlotRepository;
     private final JobEventProducer jobEventProducer;
 
+
     @Override
     public LeaveRequestDto createLeaveRequest(CreateLeaveRequest req) {
         try{
@@ -93,6 +94,7 @@ public class LeaveRequestServiceImpl implements LeaveRequestService {
                 event.setSlotId(slot.getId());
 
                 jobEventProducer.publishJobNeedReschedule(event);
+
             }else{
                 slot.setStatus(SlotStatus.BLOCKED);
             }
