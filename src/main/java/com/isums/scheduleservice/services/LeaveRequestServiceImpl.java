@@ -81,6 +81,17 @@ public class LeaveRequestServiceImpl implements LeaveRequestService {
         }
     }
 
+    @Override
+    public List<LeaveRequestDto> getLeaveRequestByStaffId(UUID staffId) {
+        try{
+            List<LeaveRequest> reqs = leaveRequestRepository.getLeaveRequestByStaffId(staffId);
+            return leaveMapper.toDtos(reqs);
+
+        } catch (Exception ex) {
+            throw new RuntimeException("Can't get leave request" + ex.getMessage());
+        }
+    }
+
     private void handleSlotWhenLeaveApproved(LeaveRequest leave){
         List<WorkSlot> slots = workSlotRepository.findSlotsOfStaffInDate(leave.getStaffId(),leave.getLeaveDate());
 

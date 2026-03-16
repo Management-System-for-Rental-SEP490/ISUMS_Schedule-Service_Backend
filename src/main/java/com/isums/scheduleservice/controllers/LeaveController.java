@@ -6,6 +6,7 @@ import com.isums.scheduleservice.infrastructures.abstracts.LeaveRequestService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -23,6 +24,11 @@ public class LeaveController {
     @PutMapping("/{id}/status")
     public ApiResponse<LeaveRequestDto> updateStatus(@PathVariable UUID id, @RequestBody UpdateLeaveStatusRequest req){
         LeaveRequestDto res = leaveRequestService.updateStatus(id,req);
+        return ApiResponses.ok(res,"update status successfully");
+    }
+    @GetMapping("/staff/{staffId}")
+    public ApiResponse<List<LeaveRequestDto>> getLeaveRequestByStaffId(@PathVariable UUID staffId){
+        List<LeaveRequestDto> res = leaveRequestService.getLeaveRequestByStaffId(staffId);
         return ApiResponses.ok(res,"update status successfully");
     }
 }
