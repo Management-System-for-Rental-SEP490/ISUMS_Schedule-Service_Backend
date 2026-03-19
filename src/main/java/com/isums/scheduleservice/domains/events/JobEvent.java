@@ -1,5 +1,6 @@
 package com.isums.scheduleservice.domains.events;
 
+import com.isums.scheduleservice.domains.enums.JobAction;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -13,15 +14,11 @@ import java.util.UUID;
 @AllArgsConstructor
 @Builder
 public class JobEvent {
-    private UUID jobId;
-
+    private UUID referenceId;
     private UUID slotId;
-
     private UUID staffId;
-
-    private String jobType;
-
+    private String referenceType;
     private LocalDateTime startTime;
-
     private LocalDateTime endTime;
+    private JobAction action;
 }

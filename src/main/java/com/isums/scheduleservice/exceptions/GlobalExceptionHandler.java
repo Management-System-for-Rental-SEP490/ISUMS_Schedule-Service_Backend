@@ -58,19 +58,4 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity.status(res.getStatusCode()).body(res);
     }
-
-    @ExceptionHandler(RuntimeException.class)
-    public ResponseEntity<ApiResponse<Void>> handleRuntime(RuntimeException ex) {
-
-        ApiResponse<Void> res = ApiResponses.fail(
-                HttpStatus.BAD_REQUEST,
-                ex.getMessage(),
-                List.of(ApiError.builder()
-                        .code("BUSINESS_ERROR")
-                        .message(ex.getMessage())
-                        .build())
-        );
-
-        return ResponseEntity.status(res.getStatusCode()).body(res);
-    }
 }

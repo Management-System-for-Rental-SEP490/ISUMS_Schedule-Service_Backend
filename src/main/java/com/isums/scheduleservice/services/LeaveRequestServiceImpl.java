@@ -6,6 +6,7 @@ import com.isums.scheduleservice.domains.dtos.UpdateLeaveStatusRequest;
 import com.isums.scheduleservice.domains.entities.LeaveHistory;
 import com.isums.scheduleservice.domains.entities.LeaveRequest;
 import com.isums.scheduleservice.domains.entities.WorkSlot;
+import com.isums.scheduleservice.domains.enums.JobAction;
 import com.isums.scheduleservice.domains.enums.LeaveRequestStatus;
 import com.isums.scheduleservice.domains.enums.SlotStatus;
 import com.isums.scheduleservice.domains.events.JobNeedRescheduleEvent;
@@ -100,9 +101,10 @@ public class LeaveRequestServiceImpl implements LeaveRequestService {
                 slot.setStatus(SlotStatus.NEED_RESCHEDULE);
 
                 JobNeedRescheduleEvent event = new JobNeedRescheduleEvent();
-                event.setJobId(slot.getJobId());
-                event.setJobType(slot.getJobType().name());
+                event.setReferenceId(slot.getJobId());
+                event.setReferenceType(slot.getJobType().name());
                 event.setSlotId(slot.getId());
+                event.setAction(JobAction.JOB_NEED_RESCHEDULE);
 
                 jobEventProducer.publishJobNeedReschedule(event);
 

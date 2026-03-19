@@ -13,15 +13,15 @@ public class JobEventProducer {
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
     public void publishJobScheduled(JobScheduledEvent event) {
-        kafkaTemplate.send("job.scheduled", event.getJobId().toString(), event);
+        kafkaTemplate.send("job.scheduled", event.getReferenceId().toString(), event);
     }
 
     public void publishJobRescheduled(JobRescheduledEvent event){
-        kafkaTemplate.send("job.rescheduled", event.getJobId().toString(),event);
+        kafkaTemplate.send("job.rescheduled", event.getReferenceId().toString(),event);
     }
 
     public void publishJobNeedReschedule(JobNeedRescheduleEvent event) {
-        kafkaTemplate.send("job.need-reschedule", event.getJobId().toString(), event);
+        kafkaTemplate.send("job.need-reschedule", event.getReferenceId().toString(), event);
     }
 
 }

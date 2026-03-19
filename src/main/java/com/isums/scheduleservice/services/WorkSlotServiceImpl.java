@@ -3,6 +3,7 @@ package com.isums.scheduleservice.services;
 import com.isums.scheduleservice.domains.dtos.*;
 import com.isums.scheduleservice.domains.entities.ScheduleTemplate;
 import com.isums.scheduleservice.domains.entities.WorkSlot;
+import com.isums.scheduleservice.domains.enums.JobAction;
 import com.isums.scheduleservice.domains.enums.SlotStatus;
 import com.isums.scheduleservice.domains.events.JobRescheduledEvent;
 import com.isums.scheduleservice.domains.events.JobScheduledEvent;
@@ -12,13 +13,16 @@ import com.isums.scheduleservice.infrastructures.mapper.ScheduleMapper;
 import com.isums.scheduleservice.infrastructures.repositories.ScheduleTemplateRepository;
 import com.isums.scheduleservice.infrastructures.repositories.WorkSlotRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cglib.core.Local;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Transactional
 @Service
@@ -58,16 +62,15 @@ public class WorkSlotServiceImpl implements WorkSlotService {
             workSlotRepository.save(slot);
 
                 JobScheduledEvent event = new JobScheduledEvent();
-                event.setJobId(req.jobId());
-                event.setJobType(req.jobType().name());
+                event.setReferenceId(req.jobId());
+                event.setReferenceType(req.jobType().name());
                 event.setSlotId(slot.getId());
                 event.setStaffId(slot.getStaffId());
                 event.setStartTime(slot.getStartTime());
                 event.setEndTime(slot.getEndTime());
+                event.setAction(JobAction.JOB_SCHEDULED);
 
                 jobEventProducer.publishJobScheduled(event);
-
-
 
             return scheduleMapper.slot(slot);
         } catch (Exception ex) {
@@ -120,6 +123,18 @@ public class WorkSlotServiceImpl implements WorkSlotService {
     }
 
     @Override
+    public WorkSlotDto getSlotById(UUID workSlotId) {
+        try{
+            WorkSlot slot = workSlotRepository.findById(workSlotId)
+                    .orElseThrow(() -> new RuntimeException("Slot not found"));
+
+            return scheduleMapper.slot(slot);
+        } catch (Exception ex) {
+            throw new RuntimeException("Can't get work slot " + ex.getMessage());
+        }
+    }
+
+    @Override
     public WorkSlotDto rescheduleSlot(RescheduleSlotRequest request) {
         try{
             WorkSlot oldSlot = workSlotRepository.findByJobIdAndStatus(request.jobId(),SlotStatus.NEED_RESCHEDULE)
@@ -160,12 +175,13 @@ public class WorkSlotServiceImpl implements WorkSlotService {
             workSlotRepository.save(oldSlot);
 
             JobRescheduledEvent event = new JobRescheduledEvent();
-            event.setJobId(request.jobId());
-            event.setJobType(request.jobType().name());
+            event.setReferenceId(request.jobId());
+            event.setReferenceType(request.jobType().name());
             event.setSlotId(newSlot.getId());
             event.setStaffId(newSlot.getStaffId());
             event.setStartTime(newSlot.getStartTime());
             event.setEndTime(newSlot.getEndTime());
+            event.setAction(JobAction.JOB_RESCHEDULED);
 
             jobEventProducer.publishJobRescheduled(event);
 
@@ -193,6 +209,64 @@ public class WorkSlotServiceImpl implements WorkSlotService {
 
         }catch (Exception ex){
             throw new RuntimeException("Can't get all slot in range " + ex.getMessage());
+        }
+    }
+
+    @Override
+    public List<DaySlotDto> generateSlots(LocalDate start, LocalDate end) {
+        try{
+            List<DaySlotDto> result = new ArrayList<>();
+            for(LocalDate date = start; !date.isAfter(end); date = date.plusDays(1)){
+                ScheduleTemplate template = scheduleTemplateRepository.findFirstByEffectiveFromLessThanEqualOrderByEffectiveFromDesc(date)
+                        .orElseThrow(() -> new RuntimeException("Template not found"));
+
+                LocalDateTime startDay = date.atTime(template.getOpenTime());
+                LocalDateTime endDay =  date.atTime(template.getCloseTime());
+
+                List<WorkSlot> exist = workSlotRepository.findByStartTimeBetween(startDay,endDay);
+
+                Set<LocalDateTime> existed = exist.stream().map(WorkSlot::getStartTime).collect(Collectors.toSet());
+
+                List<SlotsAvailableDto> slots = new ArrayList<>();
+
+                LocalDateTime cur = startDay;
+
+                while(cur.isBefore(endDay)) {
+                    LocalDateTime endSlot = cur.plusMinutes(template.getSlotMinutes());
+
+                    if (endSlot.isAfter(endDay)) break;
+
+                    LocalTime slotStart = cur.toLocalTime();
+                    LocalTime slotEndTime = endSlot.toLocalTime();
+
+                    boolean overlapBreak =
+                            slotStart.isBefore(template.getBreakEnd()) &&
+                                    slotEndTime.isAfter(template.getBreakStart());
+
+                    if (overlapBreak) {
+                        cur = template.getBreakEnd().atDate(date);
+                        continue;
+                    }
+
+                    String status = existed.contains(cur)
+                            ? "UNAVAILABLE"
+                            : "AVAILABLE";
+
+                    slots.add(new SlotsAvailableDto(
+                            cur.toLocalTime(),
+                            endSlot.toLocalTime(),
+                            status
+                    ));
+
+                    cur = endSlot.plusMinutes(template.getBufferMinutes());
+                }
+                result.add(new DaySlotDto(date,slots));
+
+                }
+            return result;
+
+        } catch (Exception ex) {
+            throw new RuntimeException("Can't generate slot" + ex.getMessage());
         }
     }
 

@@ -33,11 +33,11 @@ public class WorkSlotController {
         return ApiResponses.ok(res,"Get staff slots successfully");
     }
 
-//    @GetMapping
-//    public ApiResponse<List<WorkSlotDto>> getSlotsByDate(@RequestParam LocalDate date){
-//        List<WorkSlotDto> res = workSlotService.getSlotsByDate(date);
-//        return ApiResponses.ok(res,"Get slots by date");
-//    }
+    @GetMapping("/{slotId}")
+    public ApiResponse<WorkSlotDto> getSlotById(@PathVariable UUID slotId){
+        WorkSlotDto res = workSlotService.getSlotById(slotId);
+        return ApiResponses.ok(res,"Get slots by id successfully");
+    }
 
     @PutMapping("/{slotId}/cancel")
     public ApiResponse<Boolean> cancelSlot(@PathVariable UUID slotId){
@@ -48,6 +48,12 @@ public class WorkSlotController {
     public ApiResponse<List<WorkSlotDto>> getSlotsByRange(@RequestParam LocalDate start, @RequestParam LocalDate end) {
         List<WorkSlotDto> res = workSlotService.getSlotsByRange(start, end);
         return ApiResponses.ok(res, "Get slots successfully");
+    }
+
+    @GetMapping("/generate")
+    public ApiResponse<List<DaySlotDto>> generateSlots(@RequestParam LocalDate start, @RequestParam LocalDate end) {
+        List<DaySlotDto> res = workSlotService.generateSlots(start,end);
+        return ApiResponses.ok(res,"Generate successfully");
     }
 
 
