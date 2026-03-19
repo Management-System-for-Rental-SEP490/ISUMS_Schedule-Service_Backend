@@ -31,5 +31,6 @@ public interface WorkSlotRepository extends JpaRepository<WorkSlot, UUID> {
     """)
     List<WorkSlot> findSlotsOfStaffInDate(UUID staffId, LocalDate leaveDate);
 
+    List<WorkSlot> findByStartTimeBetween(LocalDateTime start, LocalDateTime end);
     List<WorkSlot> findByStartTimeBetweenOrderByStartTimeAsc(LocalDateTime startTime, LocalDateTime endTime);
 }
