@@ -12,11 +12,6 @@ import java.util.UUID;
 
 @Repository
 public interface ScheduleTemplateRepository extends JpaRepository<ScheduleTemplate, UUID> {
-    @Query("""
-           SELECT t
-           FROM ScheduleTemplate t
-           WHERE t.effectiveFrom <= :date
-           ORDER BY t.effectiveFrom DESC
-           """)
-   Optional<ScheduleTemplate> findEffectiveTemplates(LocalDate date);
+    Optional<ScheduleTemplate>
+    findFirstByEffectiveFromLessThanEqualOrderByEffectiveFromDesc(LocalDate date);
 }
