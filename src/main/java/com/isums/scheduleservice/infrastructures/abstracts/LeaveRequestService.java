@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.UUID;
 
 public interface LeaveRequestService {
-    LeaveRequestDto createLeaveRequest(CreateLeaveRequest req);
+    LeaveRequestDto createLeaveRequest(String staffId,CreateLeaveRequest req);
     LeaveRequestDto updateStatus(UUID leaveId, UpdateLeaveStatusRequest request);
-    List<LeaveRequestDto> getLeaveRequestByStaffId(UUID staffId);
+    List<LeaveRequestDto> getLeaveRequestByStaffId(String staffId);
 }
