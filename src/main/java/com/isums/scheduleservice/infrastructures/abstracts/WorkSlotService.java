@@ -4,6 +4,8 @@ import com.isums.scheduleservice.domains.dtos.CreateWorkSlotRequest;
 import com.isums.scheduleservice.domains.dtos.DaySlotDto;
 import com.isums.scheduleservice.domains.dtos.RescheduleSlotRequest;
 import com.isums.scheduleservice.domains.dtos.WorkSlotDto;
+import com.isums.scheduleservice.domains.events.JobEvent;
+import com.isums.scheduleservice.domains.events.SlotEvent;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -18,4 +20,5 @@ public interface WorkSlotService {
     WorkSlotDto rescheduleSlot(RescheduleSlotRequest request);
     List<WorkSlotDto> getSlotsByRange(LocalDate start,LocalDate end);
     List<DaySlotDto> generateSlots(LocalDate start, LocalDate end);
+    void markSlotDone(SlotEvent event);
 }

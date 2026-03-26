@@ -7,5 +7,6 @@ public enum SlotStatus {
     BOOKED,
     BLOCKED,
     NEED_RESCHEDULE,
-    CANCELLED
+    CANCELLED,
+    DONE
 }

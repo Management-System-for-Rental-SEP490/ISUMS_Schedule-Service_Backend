@@ -5,8 +5,10 @@ import com.isums.scheduleservice.domains.entities.ScheduleTemplate;
 import com.isums.scheduleservice.domains.entities.WorkSlot;
 import com.isums.scheduleservice.domains.enums.JobAction;
 import com.isums.scheduleservice.domains.enums.SlotStatus;
+import com.isums.scheduleservice.domains.events.JobEvent;
 import com.isums.scheduleservice.domains.events.JobRescheduledEvent;
 import com.isums.scheduleservice.domains.events.JobScheduledEvent;
+import com.isums.scheduleservice.domains.events.SlotEvent;
 import com.isums.scheduleservice.infrastructures.abstracts.WorkSlotService;
 import com.isums.scheduleservice.infrastructures.grpcs.UserClientsGrpc;
 import com.isums.scheduleservice.infrastructures.kafka.JobEventProducer;
@@ -271,6 +273,20 @@ public class WorkSlotServiceImpl implements WorkSlotService {
         } catch (Exception ex) {
             throw new RuntimeException("Can't generate slot" + ex.getMessage());
         }
+    }
+
+    @Override
+    public void markSlotDone(SlotEvent event) {
+        WorkSlot slot = workSlotRepository.findById(event.getSlotId())
+                .orElseThrow();
+
+        if(slot.getStatus() == SlotStatus.DONE){
+            return;
+        }
+
+        slot.setStatus(SlotStatus.DONE);
+
+        workSlotRepository.save(slot);
     }
 
 
