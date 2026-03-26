@@ -8,10 +8,12 @@ import com.isums.scheduleservice.domains.enums.SlotStatus;
 import com.isums.scheduleservice.domains.events.JobRescheduledEvent;
 import com.isums.scheduleservice.domains.events.JobScheduledEvent;
 import com.isums.scheduleservice.infrastructures.abstracts.WorkSlotService;
+import com.isums.scheduleservice.infrastructures.grpcs.UserClientsGrpc;
 import com.isums.scheduleservice.infrastructures.kafka.JobEventProducer;
 import com.isums.scheduleservice.infrastructures.mapper.ScheduleMapper;
 import com.isums.scheduleservice.infrastructures.repositories.ScheduleTemplateRepository;
 import com.isums.scheduleservice.infrastructures.repositories.WorkSlotRepository;
+import com.isums.userservice.grpc.UserResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cglib.core.Local;
 import org.springframework.stereotype.Service;
@@ -32,6 +34,7 @@ public class WorkSlotServiceImpl implements WorkSlotService {
     private final ScheduleTemplateRepository scheduleTemplateRepository;
     private final ScheduleMapper scheduleMapper;
     private final JobEventProducer jobEventProducer;
+    private final UserClientsGrpc userClientsGrpc;
 
 
     @Override
@@ -79,10 +82,10 @@ public class WorkSlotServiceImpl implements WorkSlotService {
     }
 
     @Override
-    public List<WorkSlotDto> getSlotsByStaffId(UUID staffId) {
+    public List<WorkSlotDto> getSlotsByStaffId(String staffId) {
         try {
-            List<WorkSlot> slots = workSlotRepository.findByStaffIdOrderByStartTimeAsc(staffId);
-
+            UserResponse user = userClientsGrpc.getUserIdAndRoleByKeyCloakId(staffId);
+            List<WorkSlot> slots = workSlotRepository.findByStaffIdOrderByStartTimeAsc(UUID.fromString(user.getId()));
             return scheduleMapper.slots(slots);
         } catch (Exception ex) {
             throw new RuntimeException("Can't get work slot " + ex.getMessage());

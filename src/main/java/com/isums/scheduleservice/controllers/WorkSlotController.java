@@ -3,6 +3,8 @@ package com.isums.scheduleservice.controllers;
 import com.isums.scheduleservice.domains.dtos.*;
 import com.isums.scheduleservice.infrastructures.abstracts.WorkSlotService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -27,9 +29,9 @@ public class WorkSlotController {
         return ApiResponses.ok(res,"Reschedule job successfully");
     }
 
-    @GetMapping("/staff/{staffId}")
-    public ApiResponse<List<WorkSlotDto>> getSlotsByStaff(@PathVariable UUID staffId){
-        List<WorkSlotDto> res = workSlotService.getSlotsByStaffId(staffId);
+    @GetMapping("/staff")
+    public ApiResponse<List<WorkSlotDto>> getSlotsByStaff(@AuthenticationPrincipal Jwt jwt){
+        List<WorkSlotDto> res = workSlotService.getSlotsByStaffId(jwt.getSubject());
         return ApiResponses.ok(res,"Get staff slots successfully");
     }
 

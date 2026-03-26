@@ -11,11 +11,13 @@ import com.isums.scheduleservice.domains.enums.LeaveRequestStatus;
 import com.isums.scheduleservice.domains.enums.SlotStatus;
 import com.isums.scheduleservice.domains.events.JobNeedRescheduleEvent;
 import com.isums.scheduleservice.infrastructures.abstracts.LeaveRequestService;
+import com.isums.scheduleservice.infrastructures.grpcs.UserClientsGrpc;
 import com.isums.scheduleservice.infrastructures.kafka.JobEventProducer;
 import com.isums.scheduleservice.infrastructures.mapper.LeaveMapper;
 import com.isums.scheduleservice.infrastructures.repositories.LeaveHistoryRepository;
 import com.isums.scheduleservice.infrastructures.repositories.LeaveRequestRepository;
 import com.isums.scheduleservice.infrastructures.repositories.WorkSlotRepository;
+import com.isums.userservice.grpc.UserResponse;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -33,17 +35,18 @@ public class LeaveRequestServiceImpl implements LeaveRequestService {
     private final LeaveMapper leaveMapper;
     private final WorkSlotRepository workSlotRepository;
     private final JobEventProducer jobEventProducer;
+    private final UserClientsGrpc userClientsGrpc;
 
 
     @Override
-    public LeaveRequestDto createLeaveRequest(CreateLeaveRequest req) {
+    public LeaveRequestDto createLeaveRequest(String staffId,CreateLeaveRequest req) {
         try{
-            if(leaveRequestRepository.existsByStaffIdAndLeaveDate(req.staffId(),req.leaveDate())){
+            if(leaveRequestRepository.existsByStaffIdAndLeaveDate(UUID.fromString(staffId),req.leaveDate())){
                 throw new RuntimeException("Leave already requested for this date");
             }
 
             LeaveRequest leave = LeaveRequest.builder()
-                    .staffId(req.staffId())
+                    .staffId(UUID.fromString(staffId))
                     .leaveDate(req.leaveDate())
                     .note(req.note())
                     .status(LeaveRequestStatus.PENDING)
@@ -83,9 +86,10 @@ public class LeaveRequestServiceImpl implements LeaveRequestService {
     }
 
     @Override
-    public List<LeaveRequestDto> getLeaveRequestByStaffId(UUID staffId) {
+    public List<LeaveRequestDto> getLeaveRequestByStaffId(String staffId) {
         try{
-            List<LeaveRequest> reqs = leaveRequestRepository.getLeaveRequestByStaffId(staffId);
+            UserResponse user = userClientsGrpc.getUserIdAndRoleByKeyCloakId(staffId);
+            List<LeaveRequest> reqs = leaveRequestRepository.getLeaveRequestByStaffId(UUID.fromString(user.getId()));
             return leaveMapper.toDtos(reqs);
 
         } catch (Exception ex) {
