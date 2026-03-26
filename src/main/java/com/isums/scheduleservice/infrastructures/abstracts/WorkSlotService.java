@@ -11,7 +11,7 @@ import java.util.UUID;
 
 public interface WorkSlotService {
     WorkSlotDto createSlots(CreateWorkSlotRequest req);
-    List<WorkSlotDto> getSlotsByStaffId(UUID staffId);
+    List<WorkSlotDto> getSlotsByStaffId(String staffId);
     //List<WorkSlotDto> getSlotsByDate(LocalDate date);
     Boolean cancelSlot(UUID slotId);
     WorkSlotDto getSlotById(UUID workSlotId);
