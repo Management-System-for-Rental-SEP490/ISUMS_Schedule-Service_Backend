@@ -1,5 +1,6 @@
 package com.isums.scheduleservice.infrastructures.kafka;
 
+import com.isums.scheduleservice.domains.events.JobEvent;
 import com.isums.scheduleservice.domains.events.JobNeedRescheduleEvent;
 import com.isums.scheduleservice.domains.events.JobRescheduledEvent;
 import com.isums.scheduleservice.domains.events.JobScheduledEvent;
@@ -22,6 +23,10 @@ public class JobEventProducer {
 
     public void publishJobNeedReschedule(JobNeedRescheduleEvent event) {
         kafkaTemplate.send("job.need-reschedule", event.getReferenceId().toString(), event);
+    }
+
+    public void publishJobAssigned(JobEvent event) {
+        kafkaTemplate.send("job.assigned", event.getReferenceId().toString(), event);
     }
 
 }

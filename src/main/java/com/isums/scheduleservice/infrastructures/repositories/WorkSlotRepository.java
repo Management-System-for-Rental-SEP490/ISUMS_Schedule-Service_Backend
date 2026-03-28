@@ -9,6 +9,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface WorkSlotRepository extends JpaRepository<WorkSlot, UUID> {
@@ -21,7 +22,6 @@ public interface WorkSlotRepository extends JpaRepository<WorkSlot, UUID> {
     """)
     List<WorkSlot> findOverlappingSlots(UUID staffId, LocalDateTime start, LocalDateTime end);
     List<WorkSlot> findByStaffIdOrderByStartTimeAsc(UUID staffId);
-    //List<WorkSlot> findByStartTimeBetweenOrderByStartTimeAsc(LocalDateTime start, LocalDateTime end);
     List<WorkSlot> findByJobIdAndStatus(UUID jobId, SlotStatus status);
 
     @Query("""
@@ -33,4 +33,25 @@ public interface WorkSlotRepository extends JpaRepository<WorkSlot, UUID> {
 
     List<WorkSlot> findByStartTimeBetween(LocalDateTime start, LocalDateTime end);
     List<WorkSlot> findByStartTimeBetweenOrderByStartTimeAsc(LocalDateTime startTime, LocalDateTime endTime);
+    boolean existsByJobIdAndStatusIn(UUID jobId,List<SlotStatus> statuses);
+
+    @Query("""
+    SELECT ws.staffId, COUNT(ws)
+    FROM WorkSlot ws
+    WHERE ws.staffId IN :staffIds
+      AND ws.createdAt >= :startOfMonth
+    GROUP BY ws.staffId
+    """)
+    List<Object[]> countJobsThisMonth(List<UUID> staffIds, Instant startOfMonth);
+
+    @Query("""
+    SELECT ws.staffId, COUNT(ws)
+    FROM WorkSlot ws
+    WHERE ws.staffId IN :staffIds
+      AND ws.status IN :statuses
+    GROUP BY ws.staffId
+    """)
+    List<Object[]> countActiveJobs(List<UUID> staffIds, List<SlotStatus> statuses);
+
+    Optional<WorkSlot> findByJobId(UUID jobId);
 }

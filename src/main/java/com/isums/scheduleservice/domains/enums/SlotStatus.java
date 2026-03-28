@@ -2,7 +2,7 @@ package com.isums.scheduleservice.domains.enums;
 
 public enum SlotStatus {
     AVAILABLE,
-    PROPOSED,
+    PENDING,
     CONFIRMED,
     BOOKED,
     BLOCKED,
