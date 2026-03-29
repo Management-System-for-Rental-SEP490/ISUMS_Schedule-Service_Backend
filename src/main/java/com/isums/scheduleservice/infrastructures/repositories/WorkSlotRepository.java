@@ -54,4 +54,6 @@ public interface WorkSlotRepository extends JpaRepository<WorkSlot, UUID> {
     List<Object[]> countActiveJobs(List<UUID> staffIds, List<SlotStatus> statuses);
 
     Optional<WorkSlot> findByJobId(UUID jobId);
+
+    Optional<WorkSlot> findFirstByJobIdAndStatusInOrderByCreatedAtDesc(UUID jobId, List<SlotStatus> statuses);
 }

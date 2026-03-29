@@ -21,6 +21,7 @@ import com.isums.scheduleservice.infrastructures.repositories.ScheduleTemplateRe
 import com.isums.scheduleservice.infrastructures.repositories.WorkSlotRepository;
 import com.isums.userservice.grpc.UserResponse;
 import lombok.RequiredArgsConstructor;
+import org.aspectj.weaver.patterns.ConcreteCflowPointcut;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,56 +43,109 @@ public class WorkSlotServiceImpl implements WorkSlotService {
     private final RedisRoundRobinService redisRoundRobinService;
 
 
+//    @Override
+//    public WorkSlotDto createSlots(CreateWorkSlotRequest req) {
+//        try {
+//
+//            boolean exists = workSlotRepository.existsByJobIdAndStatusIn(
+//                    req.jobId(),
+//                    List.of(SlotStatus.PENDING, SlotStatus.BOOKED, SlotStatus.NEED_RESCHEDULE)
+//            );
+//
+//            if (exists) {
+//                throw new RuntimeException("Job already has active slot");
+//            }
+//
+//            ScheduleTemplate template = scheduleTemplateRepository.findFirstByEffectiveFromLessThanEqualOrderByEffectiveFromDesc(req.startTime().toLocalDate())
+//                    .orElseThrow(() -> new RuntimeException("Current template not found"));
+//            LocalDateTime endTime = req.startTime().plusMinutes(template.getSlotMinutes());
+//
+//            validateWorkingHours(req.startTime(), endTime, template);
+//
+//            List<WorkSlot> conflicts = workSlotRepository.findOverlappingSlots(req.staffId(), req.startTime(), endTime);
+//
+//            if (!conflicts.isEmpty()) {
+//                throw new RuntimeException("Staff already has job in this time");
+//            }
+//
+//            WorkSlot slot = WorkSlot.builder()
+//                    .staffId(req.staffId())
+//                    .jobId(req.jobId())
+//                    .jobType(req.jobType())
+//                    .startTime((req.startTime()))
+//                    .endTime((endTime))
+//                    .status(SlotStatus.BOOKED)
+//                    .assignmentType(AssignmentType.MANUAL)
+//                    .createdAt(Instant.now())
+//                    .build();
+//
+//            WorkSlot save = workSlotRepository.save(slot);
+//
+//                JobScheduledEvent event = new JobScheduledEvent();
+//                event.setReferenceId(req.jobId());
+//                event.setReferenceType(req.jobType().name());
+//                event.setSlotId(save.getId());
+//                event.setStaffId(save.getStaffId());
+//                event.setStartTime(save.getStartTime());
+//                event.setEndTime(save.getEndTime());
+//                event.setAction(JobAction.JOB_SCHEDULED);
+//
+//                jobEventProducer.publishJobScheduled(event);
+//
+//            return scheduleMapper.slot(slot);
+//        } catch (Exception ex) {
+//            throw new RuntimeException("Can't create work slot" + ex.getMessage());
+//        }
+//    }
+
     @Override
-    public WorkSlotDto createSlots(CreateWorkSlotRequest req) {
-        try {
+    public WorkSlotDto manualAssign(ManualAssignRequest req) {
+        try{
+            WorkSlot slot = workSlotRepository.findById(req.jobId()).orElseThrow(() -> new RuntimeException("Slot not found"));
 
-            boolean exists = workSlotRepository.existsByJobIdAndStatusIn(
-                    req.jobId(),
-                    List.of(SlotStatus.PENDING, SlotStatus.BOOKED, SlotStatus.NEED_RESCHEDULE)
-            );
-
-            if (exists) {
-                throw new RuntimeException("Job already has active slot");
+            if(slot.getStatus() != SlotStatus.PENDING && slot.getStatus() != SlotStatus.NEED_RESCHEDULE){
+                throw new RuntimeException("Only pending slot can be manually assign");
             }
 
             ScheduleTemplate template = scheduleTemplateRepository.findFirstByEffectiveFromLessThanEqualOrderByEffectiveFromDesc(req.startTime().toLocalDate())
-                    .orElseThrow(() -> new RuntimeException("Current template not found"));
+                    .orElseThrow(() -> new RuntimeException("Template not found"));
+
             LocalDateTime endTime = req.startTime().plusMinutes(template.getSlotMinutes());
 
             validateWorkingHours(req.startTime(), endTime, template);
 
-            List<WorkSlot> conflicts = workSlotRepository.findOverlappingSlots(req.staffId(), req.startTime(), endTime);
+            List<WorkSlot> conflicts = workSlotRepository.findOverlappingSlots(
+                    req.staffId(),
+                    req.startTime(),
+                    endTime
+            );
 
             if (!conflicts.isEmpty()) {
                 throw new RuntimeException("Staff already has job in this time");
             }
 
-            WorkSlot slot = WorkSlot.builder()
-                    .staffId(req.staffId())
-                    .jobId(req.jobId())
-                    .jobType(req.jobType())
-                    .startTime((req.startTime()))
-                    .endTime((endTime))
-                    .status(SlotStatus.BOOKED)
-                    .assignmentType(AssignmentType.MANUAL)
-                    .createdAt(Instant.now())
-                    .build();
+            slot.setStaffId(req.staffId());
+            slot.setStartTime(req.startTime());
+            slot.setEndTime(endTime);
+            slot.setStatus(SlotStatus.BOOKED);
+            slot.setAssignmentType(AssignmentType.MANUAL);
 
-            WorkSlot save = workSlotRepository.save(slot);
+            WorkSlot saved = workSlotRepository.save(slot);
 
-                JobScheduledEvent event = new JobScheduledEvent();
-                event.setReferenceId(req.jobId());
-                event.setReferenceType(req.jobType().name());
-                event.setSlotId(save.getId());
-                event.setStaffId(save.getStaffId());
-                event.setStartTime(save.getStartTime());
-                event.setEndTime(save.getEndTime());
-                event.setAction(JobAction.JOB_SCHEDULED);
+            JobScheduledEvent event = new JobScheduledEvent();
+            event.setReferenceId(saved.getJobId());
+            event.setReferenceType(saved.getJobType().name());
+            event.setSlotId(saved.getId());
+            event.setStaffId(saved.getStaffId());
+            event.setStartTime(saved.getStartTime());
+            event.setEndTime(saved.getEndTime());
+            event.setAction(JobAction.JOB_SCHEDULED);
 
-                jobEventProducer.publishJobScheduled(event);
+            jobEventProducer.publishJobScheduled(event);
 
-            return scheduleMapper.slot(slot);
+            return scheduleMapper.slot(saved);
+
+
         } catch (Exception ex) {
             throw new RuntimeException("Can't create work slot" + ex.getMessage());
         }
@@ -338,7 +392,7 @@ public class WorkSlotServiceImpl implements WorkSlotService {
     }
 
     @Override
-    public void markSlotDone(SlotEvent event) {
+    public void markSlotDone(JobEvent event) {
         WorkSlot slot = workSlotRepository.findById(event.getSlotId())
                 .orElseThrow();
 
@@ -359,7 +413,24 @@ public class WorkSlotServiceImpl implements WorkSlotService {
         boolean exists = workSlotRepository.existsByJobIdAndStatusIn(jobId,
                 List.of(SlotStatus.PENDING,SlotStatus.BOOKED,SlotStatus.NEED_RESCHEDULE));
 
-        if(exists){
+        if (exists) {
+
+            WorkSlot existing = workSlotRepository
+                    .findFirstByJobIdAndStatusInOrderByCreatedAtDesc(
+                            jobId,
+                            List.of(SlotStatus.PENDING, SlotStatus.BOOKED, SlotStatus.NEED_RESCHEDULE)
+                    ).orElseThrow(() -> new RuntimeException("Slot already exist"));
+
+            JobEvent assignedEvent = JobEvent.builder()
+                    .referenceId(jobId)
+                    .houseId(event.getHouseId())
+                    .slotId(existing.getId())
+                    .staffId(existing.getStaffId())
+                    .referenceType(event.getReferenceType())
+                    .action(JobAction.JOB_ASSIGNED)
+                    .build();
+
+            jobEventProducer.publishJobAssigned(assignedEvent);
             return;
         }
 

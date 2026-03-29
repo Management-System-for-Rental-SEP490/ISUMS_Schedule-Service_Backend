@@ -17,16 +17,22 @@ import java.util.UUID;
 public class WorkSlotController {
     private final WorkSlotService workSlotService;
 
-    @PostMapping
-    public ApiResponse<WorkSlotDto> createSlots(@RequestBody CreateWorkSlotRequest request) {
-        WorkSlotDto res = workSlotService.createSlots(request);
-        return ApiResponses.created(res,"Create slots successfully");
-    }
+//    @PostMapping
+//    public ApiResponse<WorkSlotDto> createSlots(@RequestBody CreateWorkSlotRequest request) {
+//        WorkSlotDto res = workSlotService.createSlots(request);
+//        return ApiResponses.created(res,"Create slots successfully");
+//    }
 
     @PostMapping("/reschedule")
     public ApiResponse<WorkSlotDto> rescheduleSlot(@RequestBody RescheduleSlotRequest request){
         WorkSlotDto res = workSlotService.rescheduleSlot(request);
         return ApiResponses.ok(res,"Reschedule job successfully");
+    }
+
+    @PostMapping("/confirm")
+    public ApiResponse<WorkSlotDto> confirmSlot(@RequestBody ConfirmSlotRequest request){
+        WorkSlotDto res = workSlotService.confirmSlot(request);
+        return ApiResponses.ok(res,"Confirm successfully");
     }
 
     @GetMapping("/staff")

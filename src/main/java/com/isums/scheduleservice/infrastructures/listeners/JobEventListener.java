@@ -20,4 +20,14 @@ public class JobEventListener {
             workSlotService.handleAutoAssign(event);
         }
     }
+
+    @KafkaListener(topics = "job.completed", groupId = "schedule-group")
+    public void handleCompleted(JobEvent event) {
+
+        if(event.getAction() == JobAction.JOB_COMPLETED){
+            workSlotService.markSlotDone(event);
+        }
+
+
+    }
 }

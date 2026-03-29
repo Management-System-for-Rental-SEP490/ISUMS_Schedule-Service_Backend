@@ -9,7 +9,8 @@ import java.util.List;
 import java.util.UUID;
 
 public interface WorkSlotService {
-    WorkSlotDto createSlots(CreateWorkSlotRequest req);
+    //WorkSlotDto createSlots(CreateWorkSlotRequest req);
+    WorkSlotDto manualAssign(ManualAssignRequest req);
     WorkSlotDto confirmSlot(ConfirmSlotRequest req);
     List<WorkSlotDto> getSlotsByStaffId(String staffId);
     Boolean cancelSlot(UUID slotId);
@@ -17,6 +18,6 @@ public interface WorkSlotService {
     WorkSlotDto rescheduleSlot(RescheduleSlotRequest request);
     List<WorkSlotDto> getSlotsByRange(LocalDate start,LocalDate end);
     List<DaySlotDto> generateSlots(LocalDate start, LocalDate end);
-    void markSlotDone(SlotEvent event);
+    void markSlotDone(JobEvent event);
     void handleAutoAssign(JobEvent event);
 }
