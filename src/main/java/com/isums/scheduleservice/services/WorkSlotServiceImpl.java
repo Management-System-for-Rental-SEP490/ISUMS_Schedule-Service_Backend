@@ -101,11 +101,9 @@ public class WorkSlotServiceImpl implements WorkSlotService {
     @Override
     public WorkSlotDto manualAssign(ManualAssignRequest req) {
         try{
-            WorkSlot slot = workSlotRepository.findById(req.jobId()).orElseThrow(() -> new RuntimeException("Slot not found"));
-
-            if(slot.getStatus() != SlotStatus.PENDING && slot.getStatus() != SlotStatus.NEED_RESCHEDULE){
-                throw new RuntimeException("Only pending slot can be manually assign");
-            }
+            WorkSlot slot = workSlotRepository.findFirstByJobIdAndStatusInOrderByCreatedAtDesc(
+                            req.jobId(),
+                            List.of(SlotStatus.PENDING, SlotStatus.NEED_RESCHEDULE)).orElse(null);
 
             ScheduleTemplate template = scheduleTemplateRepository.findFirstByEffectiveFromLessThanEqualOrderByEffectiveFromDesc(req.startTime().toLocalDate())
                     .orElseThrow(() -> new RuntimeException("Template not found"));
@@ -124,6 +122,7 @@ public class WorkSlotServiceImpl implements WorkSlotService {
                 throw new RuntimeException("Staff already has job in this time");
             }
 
+            
             slot.setStaffId(req.staffId());
             slot.setStartTime(req.startTime());
             slot.setEndTime(endTime);
