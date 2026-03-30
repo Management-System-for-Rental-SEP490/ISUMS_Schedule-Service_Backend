@@ -199,6 +199,64 @@ public class WorkSlotServiceImpl implements WorkSlotService {
     }
 
     @Override
+    public WorkSlotDto staffConfirmTime(ConfirmSlotRequest req) {
+        try{
+            WorkSlot slot = workSlotRepository.findByJobId(req.jobId()).orElseThrow(() -> new RuntimeException("Slot not found"));
+
+            if(slot.getStatus() != SlotStatus.PENDING){
+                throw new RuntimeException("Only pending slot can be confirmed");
+            }
+
+            ScheduleTemplate template = scheduleTemplateRepository.findFirstByEffectiveFromLessThanEqualOrderByEffectiveFromDesc(req.startTime().toLocalDate())
+                    .orElseThrow(() -> new RuntimeException("Template not found"));
+
+            LocalDateTime endTime = req.startTime().plusMinutes(template.getSlotMinutes());
+            validateWorkingHours(req.startTime(),endTime,template);
+
+            slot.setStartTime(req.startTime());
+            slot.setEndTime(endTime);
+            slot.setStatus(SlotStatus.WAITING_MANAGER_CONFIRM);
+
+            WorkSlot save = workSlotRepository.save(slot);
+
+            return scheduleMapper.slot(save);
+        } catch (Exception ex) {
+            throw new RuntimeException("Cannot confirm slot: " + ex.getMessage(), ex);
+        }
+    }
+
+    @Override
+    public WorkSlotDto confirmSlotForStaff(UUID jobId) {
+        try{
+            WorkSlot slot = workSlotRepository.findByJobId(jobId).orElseThrow(() -> new RuntimeException("Slot not found"));
+
+            if(slot.getStatus() != SlotStatus.WAITING_MANAGER_CONFIRM){
+                throw new RuntimeException("Slot not waiting confirm");
+            }
+
+            slot.setStatus(SlotStatus.BOOKED);
+
+            WorkSlot saved = workSlotRepository.save(slot);
+
+            JobScheduledEvent event = new JobScheduledEvent();
+            event.setReferenceId(saved.getJobId());
+            event.setReferenceType(saved.getJobType().name());
+            event.setSlotId(saved.getId());
+            event.setStaffId(saved.getStaffId());
+            event.setStartTime(saved.getStartTime());
+            event.setEndTime(saved.getEndTime());
+            event.setAction(JobAction.JOB_SCHEDULED);
+
+            jobEventProducer.publishJobScheduled(event);
+
+            return scheduleMapper.slot(saved);
+
+        } catch (Exception ex) {
+            throw new RuntimeException("Cannot confirm slot: " + ex.getMessage(), ex);
+        }
+    }
+
+    @Override
     public List<WorkSlotDto> getSlotsByStaffId(String staffId) {
         try {
             UserResponse user = userClientsGrpc.getUserIdAndRoleByKeyCloakId(staffId);

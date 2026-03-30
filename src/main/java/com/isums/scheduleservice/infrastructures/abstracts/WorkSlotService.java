@@ -12,6 +12,8 @@ public interface WorkSlotService {
     //WorkSlotDto createSlots(CreateWorkSlotRequest req);
     WorkSlotDto manualAssign(ManualAssignRequest req);
     WorkSlotDto confirmSlot(ConfirmSlotRequest req);
+    WorkSlotDto staffConfirmTime(ConfirmSlotRequest req);
+    WorkSlotDto confirmSlotForStaff(UUID jobId);
     List<WorkSlotDto> getSlotsByStaffId(String staffId);
     Boolean cancelSlot(UUID slotId);
     WorkSlotDto getSlotById(UUID workSlotId);
