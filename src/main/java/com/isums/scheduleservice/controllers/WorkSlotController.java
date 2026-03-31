@@ -35,6 +35,18 @@ public class WorkSlotController {
         return ApiResponses.ok(res,"Confirm successfully");
     }
 
+    @PostMapping("/staff/confirm")
+    public ApiResponse<WorkSlotDto> confirmTime(@RequestBody ConfirmSlotRequest request){
+        WorkSlotDto res = workSlotService.staffConfirmTime(request);
+        return ApiResponses.ok(res,"Confirm time for schedule successfully");
+    }
+
+    @PostMapping("/manager/confirm/{jobId}")
+    public ApiResponse<WorkSlotDto> confirmSchedule(@PathVariable UUID jobId){
+        WorkSlotDto res = workSlotService.confirmSlotForStaff(jobId);
+        return ApiResponses.ok(res,"Confirm time for schedule successfully");
+    }
+
     @GetMapping("/staff")
     public ApiResponse<List<WorkSlotDto>> getSlotsByStaff(@AuthenticationPrincipal Jwt jwt){
         List<WorkSlotDto> res = workSlotService.getSlotsByStaffId(jwt.getSubject());
