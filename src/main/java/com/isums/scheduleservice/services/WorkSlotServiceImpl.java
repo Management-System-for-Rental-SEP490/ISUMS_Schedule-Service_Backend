@@ -203,8 +203,9 @@ public class WorkSlotServiceImpl implements WorkSlotService {
         try{
             WorkSlot slot = workSlotRepository.findByJobId(req.jobId()).orElseThrow(() -> new RuntimeException("Slot not found"));
 
-            if(slot.getStatus() != SlotStatus.PENDING){
-                throw new RuntimeException("Only pending slot can be confirmed");
+            if(slot.getStatus() != SlotStatus.PENDING
+                    && slot.getStatus() != SlotStatus.WAITING_MANAGER_CONFIRM){
+                throw new RuntimeException("Cannot update slot at this stage");
             }
 
             ScheduleTemplate template = scheduleTemplateRepository.findFirstByEffectiveFromLessThanEqualOrderByEffectiveFromDesc(req.startTime().toLocalDate())
@@ -212,6 +213,16 @@ public class WorkSlotServiceImpl implements WorkSlotService {
 
             LocalDateTime endTime = req.startTime().plusMinutes(template.getSlotMinutes());
             validateWorkingHours(req.startTime(),endTime,template);
+
+            List<WorkSlot> conflicts = workSlotRepository.findOverlappingSlots(
+                    slot.getStaffId(),
+                    req.startTime(),
+                    endTime
+            );
+
+            if (!conflicts.isEmpty()) {
+                throw new RuntimeException("Staff already has job in this time");
+            }
 
             slot.setStartTime(req.startTime());
             slot.setEndTime(endTime);
