@@ -29,4 +29,8 @@ public class JobEventProducer {
         kafkaTemplate.send("job.assigned", event.getReferenceId().toString(), event);
     }
 
+    public void publishJobWaitingConfirm(JobEvent event) {
+        kafkaTemplate.send("job.waiting.confirm", event.getReferenceId().toString(), event);
+    }
+
 }

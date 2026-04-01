@@ -230,6 +230,19 @@ public class WorkSlotServiceImpl implements WorkSlotService {
 
             WorkSlot save = workSlotRepository.save(slot);
 
+            JobEvent event = JobEvent.builder()
+                    .referenceId(save.getJobId())
+                    .slotId(save.getId())
+                    .staffId(save.getStaffId())
+                    .referenceType(save.getJobType().name())
+                    .startTime(save.getStartTime())
+                    .endTime(save.getEndTime())
+                    .action(JobAction.JOB_WAITING_MANAGER_CONFIRM)
+                    .build();
+
+            jobEventProducer.publishJobWaitingConfirm(event);
+
+
             return scheduleMapper.slot(save);
         } catch (Exception ex) {
             throw new RuntimeException("Cannot confirm slot: " + ex.getMessage(), ex);
@@ -572,7 +585,7 @@ public class WorkSlotServiceImpl implements WorkSlotService {
                         r -> (Long) r[1]
                 ));
 
-        Map<UUID,Long> activeCount = workSlotRepository.countActiveJobs(staffIds,List.of(SlotStatus.PENDING,SlotStatus.BOOKED,SlotStatus.NEED_RESCHEDULE))
+        Map<UUID,Long> activeCount = workSlotRepository.countActiveJobs(staffIds,List.of(SlotStatus.PENDING,SlotStatus.BOOKED,SlotStatus.NEED_RESCHEDULE,SlotStatus.DONE))
                 .stream()
                 .collect(Collectors.toMap(
                 r -> (UUID) r[0],
