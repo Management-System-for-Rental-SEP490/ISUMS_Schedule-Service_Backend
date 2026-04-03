@@ -101,6 +101,16 @@ public class WorkSlotServiceImpl implements WorkSlotService {
     @Override
     public WorkSlotDto manualAssign(ManualAssignRequest req) {
         try{
+
+            boolean alreadyBooked = workSlotRepository.existsByJobIdAndStatusIn(
+                    req.jobId(),
+                    List.of(SlotStatus.BOOKED)
+            );
+
+            if (alreadyBooked) {
+                throw new RuntimeException("Job already scheduled");
+            }
+
             WorkSlot slot = workSlotRepository.findFirstByJobIdAndStatusInOrderByCreatedAtDesc(
                             req.jobId(),
                             List.of(SlotStatus.PENDING, SlotStatus.NEED_RESCHEDULE)).orElse(null);
@@ -122,12 +132,25 @@ public class WorkSlotServiceImpl implements WorkSlotService {
                 throw new RuntimeException("Staff already has job in this time");
             }
 
-            
-            slot.setStaffId(req.staffId());
-            slot.setStartTime(req.startTime());
-            slot.setEndTime(endTime);
-            slot.setStatus(SlotStatus.BOOKED);
-            slot.setAssignmentType(AssignmentType.MANUAL);
+            if (slot == null) {
+                 slot = WorkSlot.builder()
+                        .jobId(req.jobId())
+                        .staffId(req.staffId())
+                        .jobType(req.jobType())
+                        .startTime(req.startTime())
+                        .endTime(endTime)
+                        .status(SlotStatus.BOOKED)
+                        .assignmentType(AssignmentType.MANUAL)
+                        .createdAt(Instant.now())
+                        .build();
+            } else {
+                slot.setStaffId(req.staffId());
+                slot.setStartTime(req.startTime());
+                slot.setEndTime(endTime);
+                slot.setStatus(SlotStatus.BOOKED);
+                slot.setAssignmentType(AssignmentType.MANUAL);
+                slot.setJobType(req.jobType());
+            }
 
             WorkSlot saved = workSlotRepository.save(slot);
 
