@@ -29,7 +29,7 @@ public class WorkSlotController {
 //        return ApiResponses.ok(res,"Reschedule job successfully");
 //    }
 
-    @PostMapping("/confirm")
+    @PostMapping("/confirm-maintenance")
     public ApiResponse<WorkSlotDto> confirmSlot(@RequestBody ConfirmSlotRequest request){
         WorkSlotDto res = workSlotService.confirmSlot(request);
         return ApiResponses.ok(res,"Confirm successfully");
@@ -41,7 +41,7 @@ public class WorkSlotController {
         return ApiResponses.ok(res,"Confirm time for schedule successfully");
     }
 
-    @PostMapping("/manager/confirm/{jobId}")
+    @PostMapping("/manager/confirm-issue/{jobId}")
     public ApiResponse<WorkSlotDto> confirmSchedule(@PathVariable UUID jobId){
         WorkSlotDto res = workSlotService.confirmSlotForStaff(jobId);
         return ApiResponses.ok(res,"Confirm time for schedule successfully");
