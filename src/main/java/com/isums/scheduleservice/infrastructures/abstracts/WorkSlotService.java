@@ -20,6 +20,7 @@ public interface WorkSlotService {
     WorkSlotDto rescheduleSlot(RescheduleSlotRequest request);
     List<WorkSlotDto> getSlotsByRange(LocalDate start,LocalDate end);
     List<DaySlotDto> generateSlots(LocalDate start, LocalDate end);
+    List<DaySlotDto> generateSlotsForStaff(String staffId, LocalDate start, LocalDate end);
     void markSlotDone(JobEvent event);
     void handleAutoAssign(JobEvent event);
 }

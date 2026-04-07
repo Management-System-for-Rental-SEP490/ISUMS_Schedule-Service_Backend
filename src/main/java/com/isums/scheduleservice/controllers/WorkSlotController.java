@@ -2,6 +2,8 @@ package com.isums.scheduleservice.controllers;
 
 import com.isums.scheduleservice.domains.dtos.*;
 import com.isums.scheduleservice.infrastructures.abstracts.WorkSlotService;
+import com.isums.scheduleservice.infrastructures.grpcs.UserClientsGrpc;
+import com.isums.userservice.grpc.UserResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -16,6 +18,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class WorkSlotController {
     private final WorkSlotService workSlotService;
+    private final UserClientsGrpc userClientsGrpc;
 
     @PostMapping("/manual")
     public ApiResponse<WorkSlotDto> manualAssign(@RequestBody ManualAssignRequest request) {
@@ -29,7 +32,7 @@ public class WorkSlotController {
 //        return ApiResponses.ok(res,"Reschedule job successfully");
 //    }
 
-    @PostMapping("/confirm")
+    @PostMapping("/confirm-maintenance")
     public ApiResponse<WorkSlotDto> confirmSlot(@RequestBody ConfirmSlotRequest request){
         WorkSlotDto res = workSlotService.confirmSlot(request);
         return ApiResponses.ok(res,"Confirm successfully");
@@ -41,7 +44,7 @@ public class WorkSlotController {
         return ApiResponses.ok(res,"Confirm time for schedule successfully");
     }
 
-    @PostMapping("/manager/confirm/{jobId}")
+    @PostMapping("/manager/confirm-issue/{jobId}")
     public ApiResponse<WorkSlotDto> confirmSchedule(@PathVariable UUID jobId){
         WorkSlotDto res = workSlotService.confirmSlotForStaff(jobId);
         return ApiResponses.ok(res,"Confirm time for schedule successfully");
@@ -73,6 +76,13 @@ public class WorkSlotController {
     @GetMapping("/generate")
     public ApiResponse<List<DaySlotDto>> generateSlots(@RequestParam LocalDate start, @RequestParam LocalDate end) {
         List<DaySlotDto> res = workSlotService.generateSlots(start,end);
+        return ApiResponses.ok(res,"Generate successfully");
+    }
+
+    @GetMapping("/generate/staff")
+    public ApiResponse<List<DaySlotDto>> generateSlotsForStaff(@AuthenticationPrincipal Jwt jwt,@RequestParam LocalDate start, @RequestParam LocalDate end) {
+        UserResponse user = userClientsGrpc.getUserIdAndRoleByKeyCloakId(jwt.getSubject());
+        List<DaySlotDto> res = workSlotService.generateSlotsForStaff(user.getId(),start,end);
         return ApiResponses.ok(res,"Generate successfully");
     }
 

@@ -56,4 +56,12 @@ public interface WorkSlotRepository extends JpaRepository<WorkSlot, UUID> {
     Optional<WorkSlot> findByJobId(UUID jobId);
 
     Optional<WorkSlot> findFirstByJobIdAndStatusInOrderByCreatedAtDesc(UUID jobId, List<SlotStatus> statuses);
+
+    @Query("""
+    SELECT w FROM WorkSlot w
+    WHERE w.staffId = :staffId
+      AND w.startTime >= :start
+      AND w.startTime < :end
+""")
+    List<WorkSlot> findAllByStaffInRange(UUID staffId, LocalDateTime start, LocalDateTime end);
 }
