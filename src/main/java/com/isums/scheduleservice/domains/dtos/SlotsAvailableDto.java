@@ -5,5 +5,6 @@ import java.time.LocalTime;
 public record SlotsAvailableDto(
         LocalTime startTime,
         LocalTime endTime,
-        String status
+        String status,
+        int availableStaffCount
 ) {}

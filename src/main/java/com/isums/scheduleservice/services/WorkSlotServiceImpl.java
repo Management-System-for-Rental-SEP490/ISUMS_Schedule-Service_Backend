@@ -11,9 +11,11 @@ import com.isums.scheduleservice.domains.events.JobEvent;
 import com.isums.scheduleservice.domains.events.JobRescheduledEvent;
 import com.isums.scheduleservice.domains.events.JobScheduledEvent;
 import com.isums.scheduleservice.domains.events.SlotEvent;
+import com.isums.scheduleservice.exceptions.BadRequestException;
 import com.isums.scheduleservice.infrastructures.RoundRobin.RedisRoundRobinService;
 import com.isums.scheduleservice.infrastructures.abstracts.WorkSlotService;
 import com.isums.scheduleservice.infrastructures.grpcs.HousesClientsGrpc;
+import com.isums.scheduleservice.infrastructures.grpcs.MaintenanceClientsGrpc;
 import com.isums.scheduleservice.infrastructures.grpcs.UserClientsGrpc;
 import com.isums.scheduleservice.infrastructures.kafka.JobEventProducer;
 import com.isums.scheduleservice.infrastructures.mapper.ScheduleMapper;
@@ -21,13 +23,11 @@ import com.isums.scheduleservice.infrastructures.repositories.ScheduleTemplateRe
 import com.isums.scheduleservice.infrastructures.repositories.WorkSlotRepository;
 import com.isums.userservice.grpc.UserResponse;
 import lombok.RequiredArgsConstructor;
-import org.aspectj.weaver.patterns.ConcreteCflowPointcut;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.*;
 import java.util.*;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
 @Transactional
@@ -40,74 +40,19 @@ public class WorkSlotServiceImpl implements WorkSlotService {
     private final JobEventProducer jobEventProducer;
     private final UserClientsGrpc userClientsGrpc;
     private final HousesClientsGrpc houseClient;
-    private final RedisRoundRobinService redisRoundRobinService;
-
-
-//    @Override
-//    public WorkSlotDto createSlots(CreateWorkSlotRequest req) {
-//        try {
-//
-//            boolean exists = workSlotRepository.existsByJobIdAndStatusIn(
-//                    req.jobId(),
-//                    List.of(SlotStatus.PENDING, SlotStatus.BOOKED, SlotStatus.NEED_RESCHEDULE)
-//            );
-//
-//            if (exists) {
-//                throw new RuntimeException("Job already has active slot");
-//            }
-//
-//            ScheduleTemplate template = scheduleTemplateRepository.findFirstByEffectiveFromLessThanEqualOrderByEffectiveFromDesc(req.startTime().toLocalDate())
-//                    .orElseThrow(() -> new RuntimeException("Current template not found"));
-//            LocalDateTime endTime = req.startTime().plusMinutes(template.getSlotMinutes());
-//
-//            validateWorkingHours(req.startTime(), endTime, template);
-//
-//            List<WorkSlot> conflicts = workSlotRepository.findOverlappingSlots(req.staffId(), req.startTime(), endTime);
-//
-//            if (!conflicts.isEmpty()) {
-//                throw new RuntimeException("Staff already has job in this time");
-//            }
-//
-//            WorkSlot slot = WorkSlot.builder()
-//                    .staffId(req.staffId())
-//                    .jobId(req.jobId())
-//                    .jobType(req.jobType())
-//                    .startTime((req.startTime()))
-//                    .endTime((endTime))
-//                    .status(SlotStatus.BOOKED)
-//                    .assignmentType(AssignmentType.MANUAL)
-//                    .createdAt(Instant.now())
-//                    .build();
-//
-//            WorkSlot save = workSlotRepository.save(slot);
-//
-//                JobScheduledEvent event = new JobScheduledEvent();
-//                event.setReferenceId(req.jobId());
-//                event.setReferenceType(req.jobType().name());
-//                event.setSlotId(save.getId());
-//                event.setStaffId(save.getStaffId());
-//                event.setStartTime(save.getStartTime());
-//                event.setEndTime(save.getEndTime());
-//                event.setAction(JobAction.JOB_SCHEDULED);
-//
-//                jobEventProducer.publishJobScheduled(event);
-//
-//            return scheduleMapper.slot(slot);
-//        } catch (Exception ex) {
-//            throw new RuntimeException("Can't create work slot" + ex.getMessage());
-//        }
-//    }
+    private final StaffAssignmentService staffAssignmentService;
+    private final MaintenanceClientsGrpc maintenanceClient;
 
     @Override
     public WorkSlotDto manualAssign(ManualAssignRequest req) {
         try{
 
-            boolean alreadyBooked = workSlotRepository.existsByJobIdAndStatusIn(
+            boolean exists  = workSlotRepository.existsByJobIdAndStatusIn(
                     req.jobId(),
                     List.of(SlotStatus.BOOKED)
             );
 
-            if (alreadyBooked) {
+            if (exists) {
                 throw new RuntimeException("Job already scheduled");
             }
 
@@ -131,6 +76,7 @@ public class WorkSlotServiceImpl implements WorkSlotService {
             if (!conflicts.isEmpty()) {
                 throw new RuntimeException("Staff already has job in this time");
             }
+
 
             if (slot == null) {
                  slot = WorkSlot.builder()
@@ -175,50 +121,6 @@ public class WorkSlotServiceImpl implements WorkSlotService {
 
     @Override
     public WorkSlotDto confirmSlot(ConfirmSlotRequest req) {
-//        try{
-//            WorkSlot slot = workSlotRepository.findByJobId(req.jobId())
-//                    .orElseThrow(() ->  new RuntimeException("Slot not found for job"));
-//
-//            if(slot.getStatus() != SlotStatus.PENDING){
-//                throw new RuntimeException("Only pending status can be confirmed ");
-//            }
-//
-//            ScheduleTemplate template = scheduleTemplateRepository.findFirstByEffectiveFromLessThanEqualOrderByEffectiveFromDesc(req.startTime().toLocalDate())
-//                    .orElseThrow(() ->  new RuntimeException("Current template not found"));
-//
-//            LocalDateTime endTime = req.startTime().plusMinutes(template.getSlotMinutes());
-//
-//            validateWorkingHours(req.startTime(),endTime,template);
-//
-//            List<WorkSlot> conflicts = workSlotRepository.findOverlappingSlots(slot.getStaffId(),req.startTime(),endTime);
-//
-//            if(!conflicts.isEmpty()){
-//                throw new RuntimeException("Staff already has job in this time");
-//            }
-//
-//            slot.setStartTime(req.startTime());
-//            slot.setEndTime(endTime);
-//            slot.setStatus(SlotStatus.BOOKED);
-//            slot.setUpdateAt(Instant.now());
-//
-//            WorkSlot updatedSlot = workSlotRepository.save(slot);
-//
-//            JobScheduledEvent event = new JobScheduledEvent();
-//            event.setReferenceId(updatedSlot.getJobId());
-//            event.setReferenceType(updatedSlot.getJobType().name());
-//            event.setSlotId(updatedSlot.getId());
-//            event.setStaffId(updatedSlot.getStaffId());
-//            event.setStartTime(updatedSlot.getStartTime());
-//            event.setEndTime(updatedSlot.getEndTime());
-//            event.setAction(JobAction.JOB_SCHEDULED);
-//
-//            jobEventProducer.publishJobScheduled(event);
-//
-//            return scheduleMapper.slot(updatedSlot);
-//
-//        } catch (Exception ex) {
-//            throw new RuntimeException("Cannot confirm slot: " + ex.getMessage(), ex);
-//        }
         try {
 
             WorkSlot slot = workSlotRepository.findByJobId(req.jobId())
@@ -226,7 +128,15 @@ public class WorkSlotServiceImpl implements WorkSlotService {
 
             if (slot.getStatus() != SlotStatus.PENDING
                     && slot.getStatus() != SlotStatus.NEED_RESCHEDULE) {
-                throw new RuntimeException("Invalid slot status");
+                throw new BadRequestException("Slot already confirmed");
+            }
+
+            UUID houseId = maintenanceClient.getHouseByJobId(req.jobId());
+            UUID regionId = houseClient.getRegionByHouseId(houseId);
+            List<UUID> staffIds = houseClient.getStaffIdsByRegion(regionId);
+
+            if (staffIds.isEmpty()) {
+                throw new RuntimeException("No staff in region");
             }
 
             ScheduleTemplate template = scheduleTemplateRepository
@@ -239,16 +149,17 @@ public class WorkSlotServiceImpl implements WorkSlotService {
 
             validateWorkingHours(req.startTime(), endTime, template);
 
-            UUID houseId = jobClient.getHouseId(req.jobId(), slot.getJobType());
-            UUID regionId = houseClient.getRegionByHouseId(houseId);
+            UUID staffId = staffAssignmentService.pickStaff(staffIds, regionId, req.startTime(), endTime);
 
-            List<UUID> staffIds = houseClient.getStaffIdsByRegion(regionId);
+            List<WorkSlot> conflicts = workSlotRepository.findOverlappingSlots(
+                    staffId,
+                    req.startTime(),
+                    endTime
+            );
 
-            if (staffIds.isEmpty()) {
-                throw new RuntimeException("No staff in region");
+            if (!conflicts.isEmpty()) {
+                throw new RuntimeException("Selected staff already has schedule");
             }
-
-            UUID staffId = pickStaff(staffIds, regionId, req.startTime(), endTime);
 
             slot.setStaffId(staffId);
             slot.setRegionId(regionId);
@@ -371,20 +282,6 @@ public class WorkSlotServiceImpl implements WorkSlotService {
         }
     }
 
-//    @Override
-//    public List<WorkSlotDto> getSlotsByDate(LocalDate date) {
-//        try {
-//            LocalDateTime start = date.atStartOfDay();
-//            LocalDateTime end = date.atTime(LocalTime.MAX);
-//
-//            List<WorkSlot> slots = workSlotRepository.findByStartTimeBetweenOrderByStartTimeAsc(start, end);
-//
-//            return scheduleMapper.slots(slots);
-//        } catch (Exception ex) {
-//            throw new RuntimeException("Can't get work slot " + ex.getMessage());
-//        }
-//    }
-
     @Override
     public Boolean cancelSlot(UUID slotId) {
         try {
@@ -430,12 +327,7 @@ public class WorkSlotServiceImpl implements WorkSlotService {
             LocalDateTime endTime = request.newStartTime().plusMinutes(template.getSlotMinutes());
             validateWorkingHours(request.newStartTime(),endTime,template);
 
-            List<WorkSlot> conflicts =
-                    workSlotRepository.findOverlappingSlots(
-                            request.newStaffId(),
-                            request.newStartTime(),
-                            endTime
-                    );
+            List<WorkSlot> conflicts = workSlotRepository.findOverlappingSlots(request.newStaffId(), request.newStartTime(), endTime);
 
             if(!conflicts.isEmpty()){
                 throw new RuntimeException("Staff already has job in this time");
@@ -495,120 +387,6 @@ public class WorkSlotServiceImpl implements WorkSlotService {
     }
 
     @Override
-    public List<DaySlotDto> generateSlots(LocalDate start, LocalDate end) {
-        try{
-            List<DaySlotDto> result = new ArrayList<>();
-            for(LocalDate date = start; !date.isAfter(end); date = date.plusDays(1)){
-                ScheduleTemplate template = scheduleTemplateRepository.findFirstByEffectiveFromLessThanEqualOrderByEffectiveFromDesc(date)
-                        .orElseThrow(() -> new RuntimeException("Template not found"));
-
-                LocalDateTime startDay = date.atTime(template.getOpenTime());
-                LocalDateTime endDay =  date.atTime(template.getCloseTime());
-
-                List<WorkSlot> exist = workSlotRepository.findByStartTimeBetween(startDay,endDay);
-
-                Set<LocalDateTime> existed = exist.stream().map(WorkSlot::getStartTime).collect(Collectors.toSet());
-
-                List<SlotsAvailableDto> slots = new ArrayList<>();
-
-                LocalDateTime cur = startDay;
-
-                while(cur.isBefore(endDay)) {
-                    LocalDateTime endSlot = cur.plusMinutes(template.getSlotMinutes());
-
-                    if (endSlot.isAfter(endDay)) break;
-
-                    LocalTime slotStart = cur.toLocalTime();
-                    LocalTime slotEndTime = endSlot.toLocalTime();
-
-                    boolean overlapBreak =
-                            slotStart.isBefore(template.getBreakEnd()) &&
-                                    slotEndTime.isAfter(template.getBreakStart());
-
-                    if (overlapBreak) {
-                        cur = template.getBreakEnd().atDate(date);
-                        continue;
-                    }
-
-                    String status = existed.contains(cur)
-                            ? "UNAVAILABLE"
-                            : "AVAILABLE";
-
-                    slots.add(new SlotsAvailableDto(
-                            cur.toLocalTime(),
-                            endSlot.toLocalTime(),
-                            status
-                    ));
-
-                    cur = endSlot.plusMinutes(template.getBufferMinutes());
-                }
-                result.add(new DaySlotDto(date,slots));
-
-                }
-            return result;
-
-        } catch (Exception ex) {
-            throw new RuntimeException("Can't generate slot" + ex.getMessage());
-        }
-    }
-
-    @Override
-    public List<DaySlotDto> generateSlotsForStaff(String staffId, LocalDate start, LocalDate end) {
-
-        LocalDateTime startRange = start.atStartOfDay();
-        LocalDateTime endRange = end.plusDays(1).atStartOfDay();
-
-        List<WorkSlot> exist = workSlotRepository
-                .findAllByStaffInRange(UUID.fromString(staffId), startRange, endRange);
-
-        Set<LocalDateTime> occupied = exist.stream()
-                .map(WorkSlot::getStartTime)
-                .collect(Collectors.toSet());
-
-        List<DaySlotDto> result = new ArrayList<>();
-
-        for (LocalDate date = start; !date.isAfter(end); date = date.plusDays(1)) {
-
-            ScheduleTemplate template = scheduleTemplateRepository
-                    .findFirstByEffectiveFromLessThanEqualOrderByEffectiveFromDesc(date)
-                    .orElseThrow(() -> new RuntimeException("Template not found"));
-
-            LocalDateTime cur = date.atTime(template.getOpenTime());
-            LocalDateTime endDay = date.atTime(template.getCloseTime());
-
-            List<SlotsAvailableDto> slots = new ArrayList<>();
-
-            while (cur.isBefore(endDay)) {
-
-                LocalDateTime endSlot = cur.plusMinutes(template.getSlotMinutes());
-                if (endSlot.isAfter(endDay)) break;
-
-                try {
-                    validateWorkingHours(cur, endSlot, template);
-
-                    String status = occupied.contains(cur)
-                            ? "UNAVAILABLE"
-                            : "AVAILABLE";
-
-                    slots.add(new SlotsAvailableDto(
-                            cur.toLocalTime(),
-                            endSlot.toLocalTime(),
-                            status
-                    ));
-
-                    cur = endSlot.plusMinutes(template.getBufferMinutes());
-                } catch (Exception e) {
-                    cur = cur.plusMinutes(template.getSlotMinutes());
-                }
-            }
-
-            result.add(new DaySlotDto(date, slots));
-        }
-
-        return result;
-    }
-
-    @Override
     public void markSlotDone(JobEvent event) {
         WorkSlot slot = workSlotRepository.findById(event.getSlotId())
                 .orElseThrow();
@@ -623,68 +401,182 @@ public class WorkSlotServiceImpl implements WorkSlotService {
     }
 
     @Override
-    public void handleAutoAssign(JobEvent event) {
+    public List<DaySlotDto> getSlotsByDate(UUID jobId, LocalDate date) {
+        try {
+            UUID houseId = maintenanceClient.getHouseByJobId(jobId);
+            UUID regionId = houseClient.getRegionByHouseId(houseId);
+            List<UUID> staffIds = houseClient.getStaffIdsByRegion(regionId);
 
-        UUID jobId = event.getReferenceId();
+            if (staffIds == null || staffIds.isEmpty()) {
+                throw new RuntimeException("No staff in region");
+            }
 
-        boolean exists = workSlotRepository.existsByJobIdAndStatusIn(jobId,
-                List.of(SlotStatus.PENDING,SlotStatus.BOOKED,SlotStatus.NEED_RESCHEDULE));
+            int totalStaff = staffIds.size();
 
-        if (exists) {
+            ScheduleTemplate template = scheduleTemplateRepository
+                    .findFirstByEffectiveFromLessThanEqualOrderByEffectiveFromDesc(date)
+                    .orElseThrow(() -> new RuntimeException("Template not found"));
 
-            WorkSlot existing = workSlotRepository
-                    .findFirstByJobIdAndStatusInOrderByCreatedAtDesc(
-                            jobId,
-                            List.of(SlotStatus.PENDING, SlotStatus.BOOKED, SlotStatus.NEED_RESCHEDULE)
-                    ).orElseThrow(() -> new RuntimeException("Slot already exist"));
+            LocalDateTime startDay = date.atTime(template.getOpenTime());
+            LocalDateTime endDay = date.atTime(template.getCloseTime());
 
-            JobEvent assignedEvent = JobEvent.builder()
-                    .referenceId(jobId)
-                    .houseId(event.getHouseId())
-                    .slotId(existing.getId())
-                    .staffId(existing.getStaffId())
-                    .referenceType(event.getReferenceType())
-                    .action(JobAction.JOB_ASSIGNED)
-                    .build();
+            List<WorkSlot> busySlots = workSlotRepository.findOverlappingSlotsForStaffs(staffIds, startDay, endDay );
 
-            jobEventProducer.publishJobAssigned(assignedEvent);
-            return;
+            List<SlotsAvailableDto> slots = new ArrayList<>();
+
+            LocalDateTime cur = startDay;
+
+            while (cur.isBefore(endDay)) {
+
+                LocalDateTime slotEnd  = cur.plusMinutes(template.getSlotMinutes());
+                if (slotEnd .isAfter(endDay)) break;
+
+                boolean overlapBreak =
+                        cur.toLocalTime().isBefore(template.getBreakEnd()) &&
+                                slotEnd .toLocalTime().isAfter(template.getBreakStart());
+
+                if (overlapBreak) {
+                    cur = template.getBreakEnd().atDate(date);
+                    continue;
+                }
+
+                validateWorkingHours(cur, slotEnd, template);
+
+                LocalDateTime slotStart = cur;
+                Set<UUID> busyStaff = busySlots.stream()
+                        .filter(s ->
+                                s.getStartTime().isBefore(slotEnd) &&
+                                        s.getEndTime().isAfter(slotStart)
+                        )
+                        .map(WorkSlot::getStaffId)
+                        .collect(Collectors.toSet());
+
+                int available = totalStaff - busyStaff.size();
+
+                slots.add(new SlotsAvailableDto(
+                        cur.toLocalTime(),
+                        slotEnd.toLocalTime(),
+                        available > 0 ? "AVAILABLE" : "UNAVAILABLE",
+                        available
+                ));
+
+                cur = slotEnd.plusMinutes(template.getBufferMinutes());
+            }
+
+            return List.of(new DaySlotDto(date, slots));
+
+        } catch (Exception ex) {
+            throw new RuntimeException("Can't get slots by date: " + ex.getMessage(), ex);
         }
-
-        UUID regionId = houseClient.getRegionByHouseId(event.getHouseId());
-
-        List<UUID> staffIds =houseClient.getStaffIdsByRegion(regionId);
-
-        if (staffIds == null || staffIds.isEmpty()) {
-            throw new RuntimeException("No staff available");
-        }
-
-        UUID staffId = pickStaffWithoutTime(staffIds, regionId);
-
-        WorkSlot slot = WorkSlot.builder()
-                .jobId(jobId)
-                .staffId(staffId)
-                .regionId(regionId)
-                .jobType(JobType.valueOf(event.getReferenceType()))
-                .status(SlotStatus.PENDING)
-                .assignmentType(AssignmentType.AUTO)
-                .createdAt(Instant.now())
-                .build();
-
-        WorkSlot save = workSlotRepository.save(slot);
-
-        JobEvent assignedEvent = JobEvent.builder()
-                .referenceId(jobId)
-                .houseId(event.getHouseId())
-                .slotId(save.getId())
-                .staffId(staffId)
-                .referenceType(event.getReferenceType())
-                .action(JobAction.JOB_ASSIGNED)
-                .build();
-
-        jobEventProducer.publishJobAssigned(assignedEvent);
     }
 
+    @Override
+    public List<UUID> getAvailableStaff(UUID jobId, LocalDate date, LocalTime startTime) {
+        WorkSlot slot = workSlotRepository.findByJobId(jobId)
+                .orElseThrow(() -> new RuntimeException("Slot not found"));
+
+        if (slot.getStatus() == SlotStatus.BOOKED && slot.getStaffId() != null) {
+            throw new RuntimeException("Slot already has assigned staff");
+        }
+        UUID houseId = maintenanceClient.getHouseByJobId(jobId);
+        UUID regionId = houseClient.getRegionByHouseId(houseId);
+
+        List<UUID> staffIds = houseClient.getStaffIdsByRegion(regionId);
+
+        ScheduleTemplate template = scheduleTemplateRepository
+                .findFirstByEffectiveFromLessThanEqualOrderByEffectiveFromDesc(date)
+                .orElseThrow();
+
+        LocalDateTime start = LocalDateTime.of(date, startTime);
+        LocalDateTime end = start.plusMinutes(template.getSlotMinutes());
+
+        List<WorkSlot> conflicts = workSlotRepository.findOverlappingSlotsForStaffs(staffIds, start, end);
+
+        Set<UUID> busyStaff = conflicts.stream()
+                .map(WorkSlot::getStaffId)
+                .collect(Collectors.toSet());
+
+        return staffIds.stream()
+                .filter(id -> !busyStaff.contains(id))
+                .toList();
+    }
+
+    @Override
+    public List<DaySlotDto> getMyAvailableSlotsRange(String staffId, LocalDate start, LocalDate end) {
+        try {
+
+            LocalDateTime startDateTime = start.atStartOfDay();
+            LocalDateTime endDateTime = end.plusDays(1).atStartOfDay();
+
+            List<WorkSlot> allSlots = workSlotRepository.findAllInRange(
+                    UUID.fromString(staffId),
+                    startDateTime,
+                    endDateTime
+            );
+
+            Map<LocalDate, Set<LocalTime>> busyMap = new HashMap<>();
+
+            for (WorkSlot slot : allSlots) {
+                LocalDate date = slot.getStartTime().toLocalDate();
+                LocalTime time = slot.getStartTime().toLocalTime();
+
+                busyMap
+                        .computeIfAbsent(date, k -> new HashSet<>())
+                        .add(time);
+            }
+
+            List<DaySlotDto> result = new ArrayList<>();
+
+            for (LocalDate date = start; !date.isAfter(end); date = date.plusDays(1)) {
+
+                ScheduleTemplate template = scheduleTemplateRepository
+                        .findFirstByEffectiveFromLessThanEqualOrderByEffectiveFromDesc(date)
+                        .orElseThrow(() -> new RuntimeException("Template not found"));
+
+                LocalDateTime cur = date.atTime(template.getOpenTime());
+                LocalDateTime endDay = date.atTime(template.getCloseTime());
+
+                List<SlotsAvailableDto> slots = new ArrayList<>();
+
+                while (cur.isBefore(endDay)) {
+
+                    LocalDateTime slotEnd = cur.plusMinutes(template.getSlotMinutes());
+                    if (slotEnd.isAfter(endDay)) break;
+
+                    boolean overlapBreak =
+                            cur.toLocalTime().isBefore(template.getBreakEnd()) &&
+                                    slotEnd.toLocalTime().isAfter(template.getBreakStart());
+
+                    if (overlapBreak) {
+                        cur = template.getBreakEnd().atDate(date);
+                        continue;
+                    }
+
+                    validateWorkingHours(cur, slotEnd, template);
+
+                    boolean isBusy = busyMap
+                            .getOrDefault(date, Set.of())
+                            .contains(cur.toLocalTime());
+
+                    slots.add(new SlotsAvailableDto(
+                            cur.toLocalTime(),
+                            slotEnd.toLocalTime(),
+                            isBusy ? "UNAVAILABLE" : "AVAILABLE",
+                            isBusy ? 0 : 1
+                    ));
+
+                    cur = slotEnd.plusMinutes(template.getBufferMinutes());
+                }
+
+                result.add(new DaySlotDto(date, slots));
+            }
+
+            return result;
+
+        } catch (Exception ex) {
+            throw new RuntimeException("Can't get slots: " + ex.getMessage(), ex);
+        }
+    }
 
     private void validateWorkingHours(LocalDateTime start,LocalDateTime end ,ScheduleTemplate template){
         LocalTime startTime = start.toLocalTime();
@@ -707,119 +599,6 @@ public class WorkSlotServiceImpl implements WorkSlotService {
         }
     }
 
-    private UUID pickStaff(List<UUID> staffIds, UUID regionId,LocalDateTime startTime,
-                           LocalDateTime endTime){
 
-        Instant startOfMonth = LocalDate.now()
-                .withDayOfMonth(1)
-                .atStartOfDay(ZoneId.systemDefault())
-                .toInstant();
-
-        Map<UUID,Long> monthlyCount = workSlotRepository.countJobsThisMonth(staffIds,startOfMonth)
-                .stream()
-                .collect(Collectors.toMap(
-                        r -> (UUID) r[0],
-                        r -> (Long) r[1]
-                ));
-
-        Map<UUID,Long> activeCount = workSlotRepository.countActiveJobs(staffIds,List.of(SlotStatus.PENDING,SlotStatus.BOOKED,SlotStatus.NEED_RESCHEDULE,SlotStatus.DONE))
-                .stream()
-                .collect(Collectors.toMap(
-                r -> (UUID) r[0],
-                r -> (Long) r[1]
-                ));
-
-        List<StaffScore> scores = staffIds.stream().map(
-                staffId -> new StaffScore(staffId,
-                        monthlyCount.getOrDefault(staffId,0L),
-                        activeCount.getOrDefault(staffId,0L)))
-                .toList();
-
-        List<StaffScore> sorted = scores.stream()
-                .sorted(Comparator.comparingLong(StaffScore::monthlyJobs).thenComparingLong(StaffScore::activeJobs))
-                .toList();
-
-        List<StaffScore> available = sorted.stream()
-                .filter(s -> workSlotRepository.findOverlappingSlots(
-                        s.staffId(),
-                        startTime,
-                        endTime
-                ).isEmpty())
-                .toList();
-
-        if (available.isEmpty()) {
-            throw new RuntimeException("No staff available in this time");
-        }
-
-        StaffScore best = sorted.getFirst();
-
-        List<StaffScore> candidates = sorted.stream()
-                .filter(s ->
-                        s.monthlyJobs() == best.monthlyJobs() &&
-                        s.activeJobs() == best.activeJobs())
-                .toList();
-
-        return pickRoundRobin(candidates, regionId);
-    }
-
-    private UUID pickRoundRobin(List<StaffScore> candidates, UUID regionId) {
-        try {
-            int index = redisRoundRobinService.getNextIndex(regionId, candidates.size());
-            return candidates.get(index).staffId();
-        } catch (Exception ex) {
-            // fallback nếu Redis lỗi
-            int index = ThreadLocalRandom.current().nextInt(candidates.size());
-            return candidates.get(index).staffId();
-        }
-    }
-
-    private UUID pickStaffWithoutTime(List<UUID> staffIds, UUID regionId) {
-
-        Instant startOfMonth = LocalDate.now()
-                .withDayOfMonth(1)
-                .atStartOfDay(ZoneId.systemDefault())
-                .toInstant();
-
-        Map<UUID, Long> monthlyCount = workSlotRepository
-                .countJobsThisMonth(staffIds, startOfMonth)
-                .stream()
-                .collect(Collectors.toMap(
-                        r -> (UUID) r[0],
-                        r -> (Long) r[1]
-                ));
-
-        Map<UUID, Long> activeCount = workSlotRepository
-                .countActiveJobs(
-                        staffIds,
-                        List.of(SlotStatus.PENDING, SlotStatus.BOOKED, SlotStatus.NEED_RESCHEDULE)
-                )
-                .stream()
-                .collect(Collectors.toMap(
-                        r -> (UUID) r[0],
-                        r -> (Long) r[1]
-                ));
-
-        List<StaffScore> sorted = staffIds.stream()
-                .map(s -> new StaffScore(
-                        s,
-                        monthlyCount.getOrDefault(s, 0L),
-                        activeCount.getOrDefault(s, 0L)
-                ))
-                .sorted(Comparator
-                        .comparingLong(StaffScore::monthlyJobs)
-                        .thenComparingLong(StaffScore::activeJobs))
-                .toList();
-
-        StaffScore best = sorted.getFirst();
-
-        List<StaffScore> candidates = sorted.stream()
-                .filter(s ->
-                        s.monthlyJobs() == best.monthlyJobs() &&
-                                s.activeJobs() == best.activeJobs()
-                )
-                .toList();
-
-        return pickRoundRobin(candidates, regionId);
-    }
 }
 

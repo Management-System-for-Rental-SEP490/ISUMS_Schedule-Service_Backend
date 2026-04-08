@@ -16,7 +16,12 @@ public interface WorkSlotRepository extends JpaRepository<WorkSlot, UUID> {
     @Query("""
     SELECT w FROM WorkSlot w
     WHERE w.staffId = :staffId
-    AND w.status = 'BOOKED'
+    AND w.status IN (
+        com.isums.scheduleservice.domains.enums.SlotStatus.PENDING,
+        com.isums.scheduleservice.domains.enums.SlotStatus.BOOKED,
+        com.isums.scheduleservice.domains.enums.SlotStatus.NEED_RESCHEDULE,
+        com.isums.scheduleservice.domains.enums.SlotStatus.WAITING_MANAGER_CONFIRM
+    )
     AND w.startTime < :end
     AND w.endTime > :start
     """)
@@ -64,4 +69,41 @@ public interface WorkSlotRepository extends JpaRepository<WorkSlot, UUID> {
       AND w.startTime < :end
 """)
     List<WorkSlot> findAllByStaffInRange(UUID staffId, LocalDateTime start, LocalDateTime end);
+
+    @Query("""
+    SELECT w FROM WorkSlot w
+    WHERE w.regionId = :regionId
+    AND w.status IN :statuses
+    AND w.startTime >= :start
+    AND w.startTime < :end
+    """)
+    List<WorkSlot> findAllBusySlotsInDay(UUID regionId, LocalDateTime start, LocalDateTime end, List<SlotStatus> statuses);
+
+    @Query("""
+    SELECT w FROM WorkSlot w
+    WHERE w.staffId IN :staffIds
+    AND w.status IN (
+        com.isums.scheduleservice.domains.enums.SlotStatus.PENDING,
+        com.isums.scheduleservice.domains.enums.SlotStatus.BOOKED,
+        com.isums.scheduleservice.domains.enums.SlotStatus.NEED_RESCHEDULE,
+        com.isums.scheduleservice.domains.enums.SlotStatus.WAITING_MANAGER_CONFIRM
+    )
+    AND w.startTime < :end
+    AND w.endTime > :start
+    """)
+    List<WorkSlot> findOverlappingSlotsForStaffs(List<UUID> staffIds, LocalDateTime start, LocalDateTime end);
+
+    @Query("""
+    SELECT w FROM WorkSlot w
+    WHERE w.staffId = :staffId
+    AND w.status IN (
+        com.isums.scheduleservice.domains.enums.SlotStatus.PENDING,
+        com.isums.scheduleservice.domains.enums.SlotStatus.BOOKED,
+        com.isums.scheduleservice.domains.enums.SlotStatus.NEED_RESCHEDULE,
+        com.isums.scheduleservice.domains.enums.SlotStatus.WAITING_MANAGER_CONFIRM
+    )
+    AND w.startTime < :end
+    AND w.endTime > :start
+""")
+    List<WorkSlot> findAllInRange(UUID staffId, LocalDateTime start, LocalDateTime end);
 }

@@ -3,7 +3,9 @@ package com.isums.scheduleservice.infrastructures.listeners;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.isums.scheduleservice.domains.events.JobEvent;
 import com.isums.scheduleservice.domains.enums.JobAction;
+import com.isums.scheduleservice.infrastructures.abstracts.AutoAssignStrategy;
 import com.isums.scheduleservice.infrastructures.abstracts.WorkSlotService;
+import com.isums.scheduleservice.services.AutoAssignStrategy.AutoAssignStrategyFactory;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -18,6 +20,7 @@ public class JobEventListener {
 
     private final WorkSlotService workSlotService;
     private final ObjectMapper objectMapper;
+    private final AutoAssignStrategyFactory factory;
 
     @KafkaListener(topics = "job.created", groupId = "schedule-group")
     public void handleCreated(ConsumerRecord<String, String> record, Acknowledgment ack) {
@@ -29,7 +32,8 @@ public class JobEventListener {
                 return;
             }
 
-            workSlotService.handleAutoAssign(event);
+            AutoAssignStrategy strategy = factory.getStrategy(event.getReferenceType());
+            strategy.handle(event);
 
             ack.acknowledge();
 

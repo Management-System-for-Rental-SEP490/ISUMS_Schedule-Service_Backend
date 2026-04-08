@@ -10,6 +10,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -73,18 +74,23 @@ public class WorkSlotController {
         return ApiResponses.ok(res, "Get slots successfully");
     }
 
-    @GetMapping("/generate")
-    public ApiResponse<List<DaySlotDto>> generateSlots(@RequestParam LocalDate start, @RequestParam LocalDate end) {
-        List<DaySlotDto> res = workSlotService.generateSlots(start,end);
-        return ApiResponses.ok(res,"Generate successfully");
+    @GetMapping("/slots")
+    public ApiResponse<List<DaySlotDto>> getSlots(@RequestParam UUID jobId, @RequestParam LocalDate date) {
+        List<DaySlotDto> res = workSlotService.getSlotsByDate(jobId, date);
+        return ApiResponses.ok(res, "Get slots successfully");
     }
 
-    @GetMapping("/generate/staff")
-    public ApiResponse<List<DaySlotDto>> generateSlotsForStaff(@AuthenticationPrincipal Jwt jwt,@RequestParam LocalDate start, @RequestParam LocalDate end) {
-        UserResponse user = userClientsGrpc.getUserIdAndRoleByKeyCloakId(jwt.getSubject());
-        List<DaySlotDto> res = workSlotService.generateSlotsForStaff(user.getId(),start,end);
-        return ApiResponses.ok(res,"Generate successfully");
+    @GetMapping("/slots/staff")
+    public ApiResponse<List<UUID>> getAvailableStaff(@RequestParam UUID jobId, @RequestParam LocalDate date, @RequestParam LocalTime startTime) {
+        List<UUID> res = workSlotService.getAvailableStaff(jobId, date, startTime);
+        return ApiResponses.ok(res, "Get available staff");
     }
 
+    @GetMapping("/slots/me")
+    public ApiResponse<List<DaySlotDto>> getMySlots(@AuthenticationPrincipal Jwt jwt, @RequestParam LocalDate startDate, @RequestParam LocalDate endDate) {
+        UserResponse user  = userClientsGrpc.getUserIdAndRoleByKeyCloakId(jwt.getSubject());
+        List<DaySlotDto> res = workSlotService.getMyAvailableSlotsRange(user.getId(),startDate,endDate);
+        return ApiResponses.ok(res, "Get my slots");
+    }
 
 }
