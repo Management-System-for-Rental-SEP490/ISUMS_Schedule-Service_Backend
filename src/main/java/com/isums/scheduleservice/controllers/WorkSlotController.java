@@ -2,12 +2,15 @@ package com.isums.scheduleservice.controllers;
 
 import com.isums.scheduleservice.domains.dtos.*;
 import com.isums.scheduleservice.infrastructures.abstracts.WorkSlotService;
+import com.isums.scheduleservice.infrastructures.grpcs.UserClientsGrpc;
+import com.isums.userservice.grpc.UserResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -16,6 +19,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class WorkSlotController {
     private final WorkSlotService workSlotService;
+    private final UserClientsGrpc userClientsGrpc;
 
     @PostMapping("/manual")
     public ApiResponse<WorkSlotDto> manualAssign(@RequestBody ManualAssignRequest request) {
@@ -29,10 +33,22 @@ public class WorkSlotController {
 //        return ApiResponses.ok(res,"Reschedule job successfully");
 //    }
 
-    @PostMapping("/confirm")
+    @PostMapping("/confirm-maintenance")
     public ApiResponse<WorkSlotDto> confirmSlot(@RequestBody ConfirmSlotRequest request){
         WorkSlotDto res = workSlotService.confirmSlot(request);
         return ApiResponses.ok(res,"Confirm successfully");
+    }
+
+    @PostMapping("/staff/confirm")
+    public ApiResponse<WorkSlotDto> confirmTime(@RequestBody ConfirmSlotRequest request){
+        WorkSlotDto res = workSlotService.staffConfirmTime(request);
+        return ApiResponses.ok(res,"Confirm time for schedule successfully");
+    }
+
+    @PostMapping("/manager/confirm-issue/{jobId}")
+    public ApiResponse<WorkSlotDto> confirmSchedule(@PathVariable UUID jobId){
+        WorkSlotDto res = workSlotService.confirmSlotForStaff(jobId);
+        return ApiResponses.ok(res,"Confirm time for schedule successfully");
     }
 
     @GetMapping("/staff")
@@ -58,11 +74,23 @@ public class WorkSlotController {
         return ApiResponses.ok(res, "Get slots successfully");
     }
 
-    @GetMapping("/generate")
-    public ApiResponse<List<DaySlotDto>> generateSlots(@RequestParam LocalDate start, @RequestParam LocalDate end) {
-        List<DaySlotDto> res = workSlotService.generateSlots(start,end);
-        return ApiResponses.ok(res,"Generate successfully");
+    @GetMapping("/slots")
+    public ApiResponse<List<DaySlotDto>> getSlots(@RequestParam UUID jobId, @RequestParam LocalDate date) {
+        List<DaySlotDto> res = workSlotService.getSlotsByDate(jobId, date);
+        return ApiResponses.ok(res, "Get slots successfully");
     }
 
+    @GetMapping("/slots/staff")
+    public ApiResponse<List<UUID>> getAvailableStaff(@RequestParam UUID jobId, @RequestParam LocalDate date, @RequestParam LocalTime startTime) {
+        List<UUID> res = workSlotService.getAvailableStaff(jobId, date, startTime);
+        return ApiResponses.ok(res, "Get available staff");
+    }
+
+    @GetMapping("/slots/me")
+    public ApiResponse<List<DaySlotDto>> getMySlots(@AuthenticationPrincipal Jwt jwt, @RequestParam LocalDate startDate, @RequestParam LocalDate endDate) {
+        UserResponse user  = userClientsGrpc.getUserIdAndRoleByKeyCloakId(jwt.getSubject());
+        List<DaySlotDto> res = workSlotService.getMyAvailableSlotsRange(user.getId(),startDate,endDate);
+        return ApiResponses.ok(res, "Get my slots");
+    }
 
 }
