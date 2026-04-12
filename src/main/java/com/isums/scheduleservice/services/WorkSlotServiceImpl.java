@@ -194,6 +194,10 @@ public class WorkSlotServiceImpl implements WorkSlotService {
         try{
             WorkSlot slot = workSlotRepository.findByJobId(req.jobId()).orElseThrow(() -> new RuntimeException("Slot not found"));
 
+            if (slot.getJobType() != JobType.ISSUE) {
+                throw new RuntimeException("Only ISSUE jobs can be confirmed. Maintenance/Inspection not allowed");
+            }
+
             if(slot.getStatus() != SlotStatus.PENDING
                     && slot.getStatus() != SlotStatus.WAITING_MANAGER_CONFIRM){
                 throw new RuntimeException("Cannot update slot at this stage");
@@ -204,16 +208,6 @@ public class WorkSlotServiceImpl implements WorkSlotService {
 
             LocalDateTime endTime = req.startTime().plusMinutes(template.getSlotMinutes());
             validateWorkingHours(req.startTime(),endTime,template);
-
-            List<WorkSlot> conflicts = workSlotRepository.findOverlappingSlots(
-                    slot.getStaffId(),
-                    req.startTime(),
-                    endTime
-            );
-
-            if (!conflicts.isEmpty()) {
-                throw new RuntimeException("Staff already has job in this time");
-            }
 
             slot.setStartTime(req.startTime());
             slot.setEndTime(endTime);
@@ -480,7 +474,7 @@ public class WorkSlotServiceImpl implements WorkSlotService {
     }
 
     @Override
-    public List<UUID> getAvailableStaff(UUID jobId, LocalDate date, LocalTime startTime) {
+    public List<StaffDto> getAvailableStaff(UUID jobId, LocalDate date, LocalTime startTime) {
         WorkSlot slot = workSlotRepository.findByJobId(jobId)
                 .orElseThrow(() -> new RuntimeException("Slot not found"));
 
@@ -492,6 +486,9 @@ public class WorkSlotServiceImpl implements WorkSlotService {
 
         List<UUID> staffIds = houseClient.getStaffIdsByRegion(regionId);
 
+        if (staffIds == null || staffIds.isEmpty()) {
+            return List.of();
+        }
         ScheduleTemplate template = scheduleTemplateRepository
                 .findFirstByEffectiveFromLessThanEqualOrderByEffectiveFromDesc(date)
                 .orElseThrow();
@@ -505,8 +502,27 @@ public class WorkSlotServiceImpl implements WorkSlotService {
                 .map(WorkSlot::getStaffId)
                 .collect(Collectors.toSet());
 
-        return staffIds.stream()
+        List<UUID> availableStaffIds = staffIds.stream()
                 .filter(id -> !busyStaff.contains(id))
+                .toList();
+
+        if (availableStaffIds.isEmpty()) {
+            return List.of();
+        }
+
+        List<UserResponse> users = availableStaffIds.stream()
+                .map(id -> userClientsGrpc.getUser(id.toString()))
+                .toList();
+
+        return users.stream()
+                .map(u -> new StaffDto(
+                        UUID.fromString(u.getId()),
+                        new UserDto(
+                                UUID.fromString(u.getId()),
+                                u.getName(),
+                                u.getPhoneNumber()
+                        )
+                ))
                 .toList();
     }
 
