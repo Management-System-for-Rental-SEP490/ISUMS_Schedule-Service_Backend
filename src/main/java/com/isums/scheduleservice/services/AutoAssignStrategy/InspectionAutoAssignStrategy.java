@@ -23,9 +23,7 @@ import java.util.UUID;
 public class InspectionAutoAssignStrategy implements AutoAssignStrategy {
 
     private final WorkSlotRepository workSlotRepository;
-    private final HousesClientsGrpc houseClient;
     private final JobEventProducer jobEventProducer;
-    private final StaffAssignmentService staffAssignmentService;
 
     @Override
     public boolean supports(String referenceType) {
@@ -42,16 +40,8 @@ public class InspectionAutoAssignStrategy implements AutoAssignStrategy {
         );
         if (exists) return;
 
-        UUID regionId = houseClient.getRegionByHouseId(event.getHouseId());
-        List<UUID> staffIds = houseClient.getStaffIdsByRegion(regionId);
-        if (staffIds.isEmpty()) throw new RuntimeException("No staff in region");
-
-        UUID staffId = staffAssignmentService.pickStaffWithoutTime(staffIds, regionId);
-
         WorkSlot slot = WorkSlot.builder()
                 .jobId(jobId)
-                .staffId(staffId)
-                .regionId(regionId)
                 .jobType(JobType.INSPECTION)
                 .status(SlotStatus.PENDING)
                 .assignmentType(AssignmentType.AUTO)
@@ -64,7 +54,6 @@ public class InspectionAutoAssignStrategy implements AutoAssignStrategy {
                 .referenceId(jobId)
                 .houseId(event.getHouseId())
                 .slotId(saved.getId())
-                .staffId(staffId)
                 .referenceType("INSPECTION")
                 .action(JobAction.JOB_ASSIGNED)
                 .build());
