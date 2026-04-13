@@ -186,6 +186,8 @@ public class WorkSlotServiceImpl implements WorkSlotService {
 
             return scheduleMapper.slot(saved);
 
+        } catch (BadRequestException ex) {
+            throw ex;
         } catch (Exception ex) {
             throw new RuntimeException("Cannot confirm slot: " + ex.getMessage(), ex);
         }
