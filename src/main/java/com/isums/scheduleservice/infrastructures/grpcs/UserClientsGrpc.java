@@ -5,9 +5,9 @@ import com.isums.userservice.grpc.GetUserIdAndRoleByKeyCloakIdRequest;
 import com.isums.userservice.grpc.UserResponse;
 import com.isums.userservice.grpc.UserServiceGrpc;
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Component;
 
-@Service
+@Component
 @RequiredArgsConstructor
 public class UserClientsGrpc {
     private final UserServiceGrpc.UserServiceBlockingStub stub;
