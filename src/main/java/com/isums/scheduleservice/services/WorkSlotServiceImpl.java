@@ -396,15 +396,13 @@ public class WorkSlotServiceImpl implements WorkSlotService {
         slot.setStatus(SlotStatus.DONE);
         workSlotRepository.save(slot);
 
-        if (slot.getJobType() == JobType.INSPECTION) {
-            jobEventProducer.publishJobCompleted(JobEvent.builder()
-                    .referenceId(slot.getJobId())
-                    .slotId(slot.getId())
-                    .staffId(slot.getStaffId())
-                    .referenceType("INSPECTION")
-                    .action(JobAction.JOB_COMPLETED)
-                    .build());
-        }
+        jobEventProducer.publishJobCompleted(JobEvent.builder()
+                .referenceId(slot.getJobId())
+                .slotId(slot.getId())
+                .staffId(slot.getStaffId())
+                .referenceType(slot.getJobType().name())
+                .action(JobAction.JOB_COMPLETED)
+                .build());
     }
 
     @Override
