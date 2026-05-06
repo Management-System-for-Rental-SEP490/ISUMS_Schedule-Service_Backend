@@ -107,9 +107,10 @@ public class StaffAssignmentService {
             int index = redisRoundRobinService.getNextIndex(regionId, candidates.size());
             return candidates.get(index).staffId();
         } catch (Exception ex) {
-            // fallback nếu Redis lỗi
+
             int index = ThreadLocalRandom.current().nextInt(candidates.size());
             return candidates.get(index).staffId();
         }
     }
 }
+

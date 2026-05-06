@@ -41,4 +41,10 @@ public class LeaveController {
         List<LeaveRequestDto> res = leaveRequestService.getLeaveRequestByStaffId(jwt.getSubject());
         return ApiResponses.ok(res, "Get my leave requests successfully");
     }
+
+    @GetMapping("/staff/{staffId}")
+    public ApiResponse<List<LeaveRequestDto>> getLeaveRequestByInternalStaffId(@PathVariable UUID staffId) {
+        List<LeaveRequestDto> res = leaveRequestService.getLeaveRequestByInternalStaffId(staffId);
+        return ApiResponses.ok(res, "Get leave requests successfully");
+    }
 }

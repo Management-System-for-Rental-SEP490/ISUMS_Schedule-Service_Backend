@@ -11,6 +11,7 @@ import com.isums.scheduleservice.domains.enums.SlotStatus;
 import com.isums.scheduleservice.domains.events.JobNeedRescheduleEvent;
 import com.isums.scheduleservice.infrastructures.grpcs.UserClientsGrpc;
 import com.isums.scheduleservice.infrastructures.kafka.JobEventProducer;
+import com.isums.scheduleservice.infrastructures.kafka.LeaveTranslationRequester;
 import com.isums.scheduleservice.infrastructures.mapper.LeaveMapper;
 import com.isums.scheduleservice.infrastructures.repositories.LeaveHistoryRepository;
 import com.isums.scheduleservice.infrastructures.repositories.LeaveRequestRepository;
@@ -47,6 +48,7 @@ class LeaveRequestServiceImplTest {
     @Mock private WorkSlotRepository slotRepo;
     @Mock private JobEventProducer jobProducer;
     @Mock private UserClientsGrpc userGrpc;
+    @Mock private LeaveTranslationRequester translationRequester;
 
     @InjectMocks private LeaveRequestServiceImpl service;
 
@@ -174,3 +176,4 @@ class LeaveRequestServiceImplTest {
         }
     }
 }
+

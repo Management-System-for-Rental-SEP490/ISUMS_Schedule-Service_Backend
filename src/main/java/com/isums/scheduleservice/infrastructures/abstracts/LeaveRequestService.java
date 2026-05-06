@@ -11,4 +11,5 @@ public interface LeaveRequestService {
     LeaveRequestDto createLeaveRequest(String staffId,CreateLeaveRequest req);
     LeaveRequestDto updateStatus(UUID leaveId, UpdateLeaveStatusRequest request);
     List<LeaveRequestDto> getLeaveRequestByStaffId(String staffId);
+    List<LeaveRequestDto> getLeaveRequestByInternalStaffId(UUID staffId);
 }

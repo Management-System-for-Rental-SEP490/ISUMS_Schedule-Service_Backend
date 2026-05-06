@@ -13,8 +13,12 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -22,6 +26,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -165,6 +170,37 @@ class StaffAssignmentServiceTest {
 
             assertThat(service.pickStaffWithoutTime(List.of(staff1), regionId))
                     .isEqualTo(staff1);
+        }
+    }
+
+    @Nested
+    @DisplayName("calculateMonthlyJobs")
+    class CalculateMonthlyJobs {
+
+        @Test
+        @DisplayName("counts jobs created from first day of current month")
+        void countsFromStartOfMonth() {
+            when(workSlotRepository.countJobsThisMonth(eq(List.of(staff1, staff2)), any()))
+                    .thenReturn(List.of(
+                            new Object[]{staff1, 6L},
+                            new Object[]{staff2, 1}
+                    ));
+
+            Map<UUID, Long> result = service.calculateMonthlyJobs(List.of(staff1, staff2));
+
+            var startOfMonthCaptor = org.mockito.ArgumentCaptor.forClass(Instant.class);
+            verify(workSlotRepository)
+                    .countJobsThisMonth(eq(List.of(staff1, staff2)), startOfMonthCaptor.capture());
+
+            Instant expectedStartOfMonth = LocalDate.now()
+                    .withDayOfMonth(1)
+                    .atStartOfDay(ZoneId.systemDefault())
+                    .toInstant();
+
+            assertThat(result)
+                    .containsEntry(staff1, 6L)
+                    .containsEntry(staff2, 1L);
+            assertThat(startOfMonthCaptor.getValue()).isEqualTo(expectedStartOfMonth);
         }
     }
 }
