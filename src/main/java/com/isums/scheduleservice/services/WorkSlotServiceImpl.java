@@ -15,6 +15,7 @@ import com.isums.scheduleservice.exceptions.BadRequestException;
 import com.isums.scheduleservice.infrastructures.RoundRobin.RedisRoundRobinService;
 import com.isums.scheduleservice.infrastructures.abstracts.WorkSlotService;
 import com.isums.scheduleservice.infrastructures.grpcs.HousesClientsGrpc;
+import com.isums.scheduleservice.infrastructures.grpcs.IssueClientGrpc;
 import com.isums.scheduleservice.infrastructures.grpcs.MaintenanceClientsGrpc;
 import com.isums.scheduleservice.infrastructures.grpcs.UserClientsGrpc;
 import com.isums.scheduleservice.infrastructures.kafka.JobEventProducer;
@@ -42,6 +43,7 @@ public class WorkSlotServiceImpl implements WorkSlotService {
     private final HousesClientsGrpc houseClient;
     private final StaffAssignmentService staffAssignmentService;
     private final MaintenanceClientsGrpc maintenanceClient;
+    private final IssueClientGrpc issueClient;
 
     @Override
     public WorkSlotDto manualAssign(ManualAssignRequest req) {
@@ -184,6 +186,8 @@ public class WorkSlotServiceImpl implements WorkSlotService {
 
             return scheduleMapper.slot(saved);
 
+        } catch (BadRequestException ex) {
+            throw ex;
         } catch (Exception ex) {
             throw new RuntimeException("Cannot confirm slot: " + ex.getMessage(), ex);
         }
@@ -193,6 +197,10 @@ public class WorkSlotServiceImpl implements WorkSlotService {
     public WorkSlotDto staffConfirmTime(ConfirmSlotRequest req) {
         try{
             WorkSlot slot = workSlotRepository.findByJobId(req.jobId()).orElseThrow(() -> new RuntimeException("Slot not found"));
+
+            if (slot.getJobType() != JobType.ISSUE) {
+                throw new RuntimeException("Only ISSUE jobs can be confirmed. Maintenance/Inspection not allowed");
+            }
 
             if(slot.getStatus() != SlotStatus.PENDING
                     && slot.getStatus() != SlotStatus.WAITING_MANAGER_CONFIRM){
@@ -204,16 +212,6 @@ public class WorkSlotServiceImpl implements WorkSlotService {
 
             LocalDateTime endTime = req.startTime().plusMinutes(template.getSlotMinutes());
             validateWorkingHours(req.startTime(),endTime,template);
-
-            List<WorkSlot> conflicts = workSlotRepository.findOverlappingSlots(
-                    slot.getStaffId(),
-                    req.startTime(),
-                    endTime
-            );
-
-            if (!conflicts.isEmpty()) {
-                throw new RuntimeException("Staff already has job in this time");
-            }
 
             slot.setStartTime(req.startTime());
             slot.setEndTime(endTime);
@@ -391,13 +389,20 @@ public class WorkSlotServiceImpl implements WorkSlotService {
         WorkSlot slot = workSlotRepository.findById(event.getSlotId())
                 .orElseThrow();
 
-        if(slot.getStatus() == SlotStatus.DONE){
+        if (slot.getStatus() == SlotStatus.DONE) {
             return;
         }
 
         slot.setStatus(SlotStatus.DONE);
-
         workSlotRepository.save(slot);
+
+        jobEventProducer.publishJobCompleted(JobEvent.builder()
+                .referenceId(slot.getJobId())
+                .slotId(slot.getId())
+                .staffId(slot.getStaffId())
+                .referenceType(slot.getJobType().name())
+                .action(JobAction.JOB_COMPLETED)
+                .build());
     }
 
     @Override
@@ -471,18 +476,21 @@ public class WorkSlotServiceImpl implements WorkSlotService {
     }
 
     @Override
-    public List<UUID> getAvailableStaff(UUID jobId, LocalDate date, LocalTime startTime) {
+    public List<StaffDto> getAvailableStaff(UUID jobId, LocalDate date, LocalTime startTime) {
         WorkSlot slot = workSlotRepository.findByJobId(jobId)
                 .orElseThrow(() -> new RuntimeException("Slot not found"));
 
         if (slot.getStatus() == SlotStatus.BOOKED && slot.getStaffId() != null) {
             throw new RuntimeException("Slot already has assigned staff");
         }
-        UUID houseId = maintenanceClient.getHouseByJobId(jobId);
+        UUID houseId = resolveHouseId(jobId);
         UUID regionId = houseClient.getRegionByHouseId(houseId);
 
         List<UUID> staffIds = houseClient.getStaffIdsByRegion(regionId);
 
+        if (staffIds == null || staffIds.isEmpty()) {
+            return List.of();
+        }
         ScheduleTemplate template = scheduleTemplateRepository
                 .findFirstByEffectiveFromLessThanEqualOrderByEffectiveFromDesc(date)
                 .orElseThrow();
@@ -496,8 +504,28 @@ public class WorkSlotServiceImpl implements WorkSlotService {
                 .map(WorkSlot::getStaffId)
                 .collect(Collectors.toSet());
 
-        return staffIds.stream()
+        List<UUID> availableStaffIds = staffIds.stream()
                 .filter(id -> !busyStaff.contains(id))
+                .toList();
+
+        if (availableStaffIds.isEmpty()) {
+            return List.of();
+        }
+
+        List<UserResponse> users = availableStaffIds.stream()
+                .map(id -> userClientsGrpc.getUser(id.toString()))
+                .toList();
+
+        return users.stream()
+                .map(u -> new StaffDto(
+                        UUID.fromString(u.getId()),
+                        new UserDto(
+                                UUID.fromString(u.getId()),
+                                u.getName(),
+                                u.getEmail(),
+                                u.getPhoneNumber()
+                        )
+                ))
                 .toList();
     }
 
@@ -599,6 +627,16 @@ public class WorkSlotServiceImpl implements WorkSlotService {
         }
     }
 
-
+    private UUID resolveHouseId(UUID jobId) {
+        try {
+            return maintenanceClient.getHouseByJobId(jobId);
+        } catch (Exception ex1) {
+            try {
+                return issueClient.getHouseByJobId(jobId);
+            } catch (Exception ex2) {
+                throw new RuntimeException("Job not found in both maintenance & issue: " + jobId,ex2);
+            }
+        }
+    }
 }
 

@@ -21,6 +21,6 @@ public interface WorkSlotService {
     List<WorkSlotDto> getSlotsByRange(LocalDate start,LocalDate end);
     void markSlotDone(JobEvent event);
     List<DaySlotDto> getSlotsByDate(UUID jobId, LocalDate date);
-    List<UUID> getAvailableStaff(UUID jobId, LocalDate date, LocalTime startTime);
+    List<StaffDto> getAvailableStaff(UUID jobId, LocalDate date, LocalTime startTime);
     List<DaySlotDto> getMyAvailableSlotsRange(String staffId, LocalDate start, LocalDate end);
 }

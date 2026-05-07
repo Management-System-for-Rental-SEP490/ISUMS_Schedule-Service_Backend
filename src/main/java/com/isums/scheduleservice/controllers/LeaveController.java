@@ -20,22 +20,31 @@ public class LeaveController {
     private final LeaveRequestService leaveRequestService;
     private final UserClientsGrpc userClientsGrpc;
 
-
+    // Staff creates a leave request for the authenticated account.
     @PostMapping
-    public ApiResponse<LeaveRequestDto> createLeaveRequest(@AuthenticationPrincipal Jwt jwt, @RequestBody CreateLeaveRequest req){
+    public ApiResponse<LeaveRequestDto> createLeaveRequest(@AuthenticationPrincipal Jwt jwt, @RequestBody CreateLeaveRequest req) {
         UserResponse user = userClientsGrpc.getUserIdAndRoleByKeyCloakId(jwt.getSubject());
-        LeaveRequestDto res = leaveRequestService.createLeaveRequest(user.getId(),req);
-        return ApiResponses.created(res,"Create leave request successfully");
+        LeaveRequestDto res = leaveRequestService.createLeaveRequest(user.getId(), req);
+        return ApiResponses.created(res, "Create leave request successfully");
     }
 
+    // Manager/admin updates the review status for a leave request.
     @PutMapping("/{id}/status")
-    public ApiResponse<LeaveRequestDto> updateStatus(@PathVariable UUID id, @RequestBody UpdateLeaveStatusRequest req){
-        LeaveRequestDto res = leaveRequestService.updateStatus(id,req);
-        return ApiResponses.ok(res,"update status successfully");
+    public ApiResponse<LeaveRequestDto> updateStatus(@PathVariable UUID id, @RequestBody UpdateLeaveStatusRequest req) {
+        LeaveRequestDto res = leaveRequestService.updateStatus(id, req);
+        return ApiResponses.ok(res, "Update leave status successfully");
     }
+
+    // Staff reads leave requests belonging to the authenticated account.
     @GetMapping("/me")
-    public ApiResponse<List<LeaveRequestDto>> getLeaveRequestByStaffId(@AuthenticationPrincipal Jwt jwt){
+    public ApiResponse<List<LeaveRequestDto>> getLeaveRequestByStaffId(@AuthenticationPrincipal Jwt jwt) {
         List<LeaveRequestDto> res = leaveRequestService.getLeaveRequestByStaffId(jwt.getSubject());
-        return ApiResponses.ok(res,"update status successfully");
+        return ApiResponses.ok(res, "Get my leave requests successfully");
+    }
+
+    @GetMapping("/staff/{staffId}")
+    public ApiResponse<List<LeaveRequestDto>> getLeaveRequestByInternalStaffId(@PathVariable UUID staffId) {
+        List<LeaveRequestDto> res = leaveRequestService.getLeaveRequestByInternalStaffId(staffId);
+        return ApiResponses.ok(res, "Get leave requests successfully");
     }
 }

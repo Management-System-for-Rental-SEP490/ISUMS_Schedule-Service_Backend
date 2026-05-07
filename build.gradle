@@ -26,6 +26,18 @@ configurations {
         extendsFrom annotationProcessor
     }
 }
+configurations.configureEach {
+    resolutionStrategy {
+        force 'com.google.protobuf:protobuf-java:4.34.0'
+        force 'com.google.protobuf:protobuf-java-util:4.34.0'
+        eachDependency { details ->
+            if (details.requested.group == 'com.google.protobuf' && (details.requested.name == 'protobuf-java' || details.requested.name == 'protobuf-java-util')) {
+                details.useVersion '4.34.0'
+                details.because 'Keep protobuf runtime aligned with generated proto-common classes'
+            }
+        }
+    }
+}
 
 repositories {
     mavenCentral()
@@ -33,6 +45,14 @@ repositories {
     maven {
         name = "GitHubPackages"
         url = uri("https://maven.pkg.github.com/Management-System-for-Rental-SEP490/ISUMS_Proto-common_gRPC-Maven-local")
+        credentials {
+            username = System.getenv("GITHUB_ACTOR") ?: ""
+            password = System.getenv("GITHUB_TOKEN") ?: ""
+        }
+    }
+    maven {
+        name = "GitHubPackagesObservability"
+        url = uri("https://maven.pkg.github.com/Management-System-for-Rental-SEP490/ISUMS_Observability-Common")
         credentials {
             username = System.getenv("GITHUB_ACTOR") ?: ""
             password = System.getenv("GITHUB_TOKEN") ?: ""
@@ -48,6 +68,10 @@ dependencyManagement {
 }
 
 dependencies {
+    implementation 'net.logstash.logback:logstash-logback-encoder:8.1'
+    implementation 'io.opentelemetry:opentelemetry-exporter-otlp'
+    implementation 'io.micrometer:micrometer-tracing-bridge-otel'
+    implementation 'com.isums:isums-observability-common:1.0-SNAPSHOT'
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
     implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'
@@ -65,7 +89,8 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'io.micrometer:micrometer-registry-prometheus'
 
-    implementation 'com.google.protobuf:protobuf-java:4.34.0-RC2'
+    implementation 'com.google.protobuf:protobuf-java:4.34.0'
+    implementation 'com.google.protobuf:protobuf-java-util:4.34.0'
     implementation "org.springframework.grpc:spring-grpc-client-spring-boot-starter"
     implementation "org.springframework.grpc:spring-grpc-spring-boot-starter"
 
@@ -90,24 +115,8 @@ tasks.named('bootBuildImage') {
     runImage = 'paketobuildpacks/ubuntu-noble-run:latest'
 }
 
-//protobuf {
-//    protoc {
-//        artifact = 'com.google.protobuf:protoc'
-//    }
-//    plugins {
-//        grpc {
-//            artifact = 'io.grpc:protoc-gen-grpc-java'
-//        }
-//    }
-//    generateProtoTasks {
-//        all()*.plugins {
-//            grpc {
-//                option '@generated=omit'
-//            }
-//        }
-//    }
-//}
-
 tasks.named('test') {
     useJUnitPlatform()
 }
+
+tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }

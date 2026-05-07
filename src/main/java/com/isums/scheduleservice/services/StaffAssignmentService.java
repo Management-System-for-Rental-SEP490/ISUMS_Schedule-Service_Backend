@@ -47,18 +47,7 @@ public class StaffAssignmentService {
 
     public UUID pickStaffWithoutTime(List<UUID> staffIds, UUID regionId) {
 
-        Instant startOfMonth = LocalDate.now()
-                .withDayOfMonth(1)
-                .atStartOfDay(ZoneId.systemDefault())
-                .toInstant();
-
-        Map<UUID, Long> monthlyCount = workSlotRepository
-                .countJobsThisMonth(staffIds, startOfMonth)
-                .stream()
-                .collect(Collectors.toMap(
-                        r -> (UUID) r[0],
-                        r -> (Long) r[1]
-                ));
+        Map<UUID, Long> monthlyCount = calculateMonthlyJobs(staffIds);
 
         Map<UUID, Long> activeCount = workSlotRepository
                 .countActiveJobs(
@@ -94,14 +83,34 @@ public class StaffAssignmentService {
         return pickRoundRobin(candidates, regionId);
     }
 
+    public Map<UUID, Long> calculateMonthlyJobs(List<UUID> staffIds) {
+        if (staffIds == null || staffIds.isEmpty()) {
+            return Map.of();
+        }
+
+        Instant startOfMonth = LocalDate.now()
+                .withDayOfMonth(1)
+                .atStartOfDay(ZoneId.systemDefault())
+                .toInstant();
+
+        return workSlotRepository
+                .countJobsThisMonth(staffIds, startOfMonth)
+                .stream()
+                .collect(Collectors.toMap(
+                        r -> (UUID) r[0],
+                        r -> ((Number) r[1]).longValue()
+                ));
+    }
+
     private UUID pickRoundRobin(List<StaffScore> candidates, UUID regionId) {
         try {
             int index = redisRoundRobinService.getNextIndex(regionId, candidates.size());
             return candidates.get(index).staffId();
         } catch (Exception ex) {
-            // fallback nếu Redis lỗi
+
             int index = ThreadLocalRandom.current().nextInt(candidates.size());
             return candidates.get(index).staffId();
         }
     }
 }
+

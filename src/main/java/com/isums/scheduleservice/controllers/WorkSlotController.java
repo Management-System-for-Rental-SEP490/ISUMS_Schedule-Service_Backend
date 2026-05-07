@@ -81,8 +81,8 @@ public class WorkSlotController {
     }
 
     @GetMapping("/slots/staff")
-    public ApiResponse<List<UUID>> getAvailableStaff(@RequestParam UUID jobId, @RequestParam LocalDate date, @RequestParam LocalTime startTime) {
-        List<UUID> res = workSlotService.getAvailableStaff(jobId, date, startTime);
+    public ApiResponse<List<StaffDto>> getAvailableStaff(@RequestParam UUID jobId, @RequestParam LocalDate date, @RequestParam LocalTime startTime) {
+        List<StaffDto> res = workSlotService.getAvailableStaff(jobId, date, startTime);
         return ApiResponses.ok(res, "Get available staff");
     }
 

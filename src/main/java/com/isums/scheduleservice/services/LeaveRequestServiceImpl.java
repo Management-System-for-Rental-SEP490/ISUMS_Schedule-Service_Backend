@@ -13,6 +13,7 @@ import com.isums.scheduleservice.domains.events.JobNeedRescheduleEvent;
 import com.isums.scheduleservice.infrastructures.abstracts.LeaveRequestService;
 import com.isums.scheduleservice.infrastructures.grpcs.UserClientsGrpc;
 import com.isums.scheduleservice.infrastructures.kafka.JobEventProducer;
+import com.isums.scheduleservice.infrastructures.kafka.LeaveTranslationRequester;
 import com.isums.scheduleservice.infrastructures.mapper.LeaveMapper;
 import com.isums.scheduleservice.infrastructures.repositories.LeaveHistoryRepository;
 import com.isums.scheduleservice.infrastructures.repositories.LeaveRequestRepository;
@@ -20,6 +21,8 @@ import com.isums.scheduleservice.infrastructures.repositories.WorkSlotRepository
 import com.isums.userservice.grpc.UserResponse;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -36,9 +39,11 @@ public class LeaveRequestServiceImpl implements LeaveRequestService {
     private final WorkSlotRepository workSlotRepository;
     private final JobEventProducer jobEventProducer;
     private final UserClientsGrpc userClientsGrpc;
+    private final LeaveTranslationRequester translationRequester;
 
 
     @Override
+    @CacheEvict(value = "staff-leave", allEntries = true)
     public LeaveRequestDto createLeaveRequest(String staffId,CreateLeaveRequest req) {
         try{
             if(leaveRequestRepository.existsByStaffIdAndLeaveDate(UUID.fromString(staffId),req.leaveDate())){
@@ -54,6 +59,7 @@ public class LeaveRequestServiceImpl implements LeaveRequestService {
                     .build();
 
             leaveRequestRepository.save(leave);
+            translationRequester.requestForLeave(leave);
 
             return leaveMapper.toDto(leave);
         } catch (Exception ex) {
@@ -62,6 +68,7 @@ public class LeaveRequestServiceImpl implements LeaveRequestService {
     }
 
     @Override
+    @CacheEvict(value = "staff-leave", allEntries = true)
     public LeaveRequestDto updateStatus(UUID leaveId, UpdateLeaveStatusRequest request) {
         try{
             LeaveRequest leave = leaveRequestRepository.findById(leaveId)
@@ -77,6 +84,7 @@ public class LeaveRequestServiceImpl implements LeaveRequestService {
             }
 
             LeaveRequest save = leaveRequestRepository.save(leave);
+            translationRequester.requestForLeave(save);
 
             return leaveMapper.toDto(leave);
 
@@ -86,12 +94,24 @@ public class LeaveRequestServiceImpl implements LeaveRequestService {
     }
 
     @Override
+    @Cacheable(value = "staff-leave", key = "'kc:' + #staffId")
     public List<LeaveRequestDto> getLeaveRequestByStaffId(String staffId) {
         try{
             UserResponse user = userClientsGrpc.getUserIdAndRoleByKeyCloakId(staffId);
             List<LeaveRequest> reqs = leaveRequestRepository.getLeaveRequestByStaffId(UUID.fromString(user.getId()));
             return leaveMapper.toDtos(reqs);
 
+        } catch (Exception ex) {
+            throw new RuntimeException("Can't get leave request" + ex.getMessage());
+        }
+    }
+
+    @Override
+    @Cacheable(value = "staff-leave", key = "'uid:' + #staffId")
+    public List<LeaveRequestDto> getLeaveRequestByInternalStaffId(UUID staffId) {
+        try {
+            List<LeaveRequest> reqs = leaveRequestRepository.getLeaveRequestByStaffId(staffId);
+            return leaveMapper.toDtos(reqs);
         } catch (Exception ex) {
             throw new RuntimeException("Can't get leave request" + ex.getMessage());
         }

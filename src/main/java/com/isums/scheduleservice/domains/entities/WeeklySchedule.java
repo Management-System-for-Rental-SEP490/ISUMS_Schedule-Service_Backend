@@ -38,7 +38,6 @@ public class WeeklySchedule {
     @Column(name = "template_id", nullable = false)
     private UUID templateId;
 
-    // Monday của tuần
     @Column(name = "week_start_date", nullable = false)
     private LocalDate weekStartDate;
 
