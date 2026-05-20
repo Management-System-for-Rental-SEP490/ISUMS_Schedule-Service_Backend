@@ -24,8 +24,19 @@ public class JobEventListener {
 
     @KafkaListener(topics = "job.created", groupId = "schedule-group")
     public void handleCreated(ConsumerRecord<String, String> record, Acknowledgment ack) {
+        log.error("[Schedule] >>> ENTRY topic={} part={} offset={} keyNull={} valNull={} valLen={}",
+                record.topic(), record.partition(), record.offset(),
+                record.key() == null, record.value() == null,
+                record.value() != null ? record.value().length() : -1);
         try {
+            if (record.value() == null) {
+                log.error("[Schedule] Null value at offset={}, ack and skip", record.offset());
+                ack.acknowledge();
+                return;
+            }
             JobEvent event = objectMapper.readValue(record.value(), JobEvent.class);
+            log.info("[Schedule] Parsed event refId={} refType={} action={}",
+                    event.getReferenceId(), event.getReferenceType(), event.getAction());
 
             if (event.getAction() != JobAction.JOB_CREATED) {
                 ack.acknowledge();
@@ -44,7 +55,7 @@ public class JobEventListener {
             ack.acknowledge();
         } catch (Exception e) {
             log.error("[Schedule] handleCreated failed: {}", e.getMessage(), e);
-            throw new RuntimeException(e);
+            ack.acknowledge();
         }
     }
 
