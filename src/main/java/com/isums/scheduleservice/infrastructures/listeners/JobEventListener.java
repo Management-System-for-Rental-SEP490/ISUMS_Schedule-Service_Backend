@@ -23,12 +23,12 @@ public class JobEventListener {
     private final AutoAssignStrategyFactory factory;
 
     @KafkaListener(topics = "job.created", groupId = "schedule-group")
-    public void handleCreated(String payload, Acknowledgment ack) {
+    public void handleCreated(String payload) {
+        System.out.println("[Schedule] STDOUT ENTRY len=" + (payload == null ? -1 : payload.length()));
         log.error("[Schedule] >>> ENTRY len={}", payload == null ? -1 : payload.length());
         try {
             if (payload == null || payload.isBlank()) {
-                log.error("[Schedule] Null/empty payload, ack and skip");
-                ack.acknowledge();
+                log.error("[Schedule] Null/empty payload, skip");
                 return;
             }
             JobEvent event = objectMapper.readValue(payload, JobEvent.class);
@@ -36,19 +36,15 @@ public class JobEventListener {
                     event.getReferenceId(), event.getReferenceType(), event.getAction());
 
             if (event.getAction() != JobAction.JOB_CREATED) {
-                ack.acknowledge();
                 return;
             }
 
             AutoAssignStrategy strategy = factory.getStrategy(event.getReferenceType());
             strategy.handle(event);
-
-            ack.acknowledge();
             log.info("[Schedule] JOB_CREATED handled jobId={}", event.getReferenceId());
 
         } catch (Exception e) {
             log.error("[Schedule] handleCreated failed: {}", e.getMessage(), e);
-            ack.acknowledge();
         }
     }
 
