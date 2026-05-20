@@ -23,8 +23,7 @@ public class JobEventListener {
     private final AutoAssignStrategyFactory factory;
 
     @KafkaListener(topics = "job.created", groupId = "schedule-group")
-    public void handleCreated(@org.springframework.messaging.handler.annotation.Payload(required = false) String payload,
-                              Acknowledgment ack) {
+    public void handleCreated(String payload, Acknowledgment ack) {
         log.error("[Schedule] >>> ENTRY len={}", payload == null ? -1 : payload.length());
         try {
             if (payload == null || payload.isBlank()) {
