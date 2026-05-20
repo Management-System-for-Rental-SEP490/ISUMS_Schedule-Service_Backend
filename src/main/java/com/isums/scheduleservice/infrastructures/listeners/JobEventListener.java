@@ -23,19 +23,17 @@ public class JobEventListener {
     private final AutoAssignStrategyFactory factory;
 
     @KafkaListener(topics = "job.created", groupId = "schedule-group")
-    public void handleCreated(ConsumerRecord<String, String> record, Acknowledgment ack) {
-        log.error("[Schedule] >>> ENTRY topic={} part={} offset={} keyNull={} valNull={} valLen={}",
-                record.topic(), record.partition(), record.offset(),
-                record.key() == null, record.value() == null,
-                record.value() != null ? record.value().length() : -1);
+    public void handleCreated(@org.springframework.messaging.handler.annotation.Payload(required = false) String payload,
+                              Acknowledgment ack) {
+        log.error("[Schedule] >>> ENTRY len={}", payload == null ? -1 : payload.length());
         try {
-            if (record.value() == null) {
-                log.error("[Schedule] Null value at offset={}, ack and skip", record.offset());
+            if (payload == null || payload.isBlank()) {
+                log.error("[Schedule] Null/empty payload, ack and skip");
                 ack.acknowledge();
                 return;
             }
-            JobEvent event = objectMapper.readValue(record.value(), JobEvent.class);
-            log.info("[Schedule] Parsed event refId={} refType={} action={}",
+            JobEvent event = objectMapper.readValue(payload, JobEvent.class);
+            log.info("[Schedule] Parsed refId={} refType={} action={}",
                     event.getReferenceId(), event.getReferenceType(), event.getAction());
 
             if (event.getAction() != JobAction.JOB_CREATED) {
@@ -47,12 +45,8 @@ public class JobEventListener {
             strategy.handle(event);
 
             ack.acknowledge();
-
             log.info("[Schedule] JOB_CREATED handled jobId={}", event.getReferenceId());
 
-        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
-            log.error("[Schedule] Deserialize failed raw={}: {}", record.value(), e.getMessage());
-            ack.acknowledge();
         } catch (Exception e) {
             log.error("[Schedule] handleCreated failed: {}", e.getMessage(), e);
             ack.acknowledge();
