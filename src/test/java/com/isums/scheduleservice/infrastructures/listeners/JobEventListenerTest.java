@@ -8,7 +8,6 @@ import com.isums.scheduleservice.infrastructures.abstracts.AutoAssignStrategy;
 import com.isums.scheduleservice.infrastructures.abstracts.WorkSlotService;
 import com.isums.scheduleservice.services.AutoAssignStrategy.AutoAssignStrategyFactory;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -25,6 +24,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -43,13 +43,8 @@ class JobEventListenerTest {
         return new ConsumerRecord<>("t", 0, 0L, "k", payload);
     }
 
-    @BeforeEach
-    void setUp() {
-        // nothing shared — tests provide mocks per scenario
-    }
-
     @Test
-    @DisplayName("handleCreated routes to strategy and acks when action is JOB_CREATED")
+    @DisplayName("handleCreated routes to strategy when action is JOB_CREATED")
     void createdRoutes() throws Exception {
         JobEvent evt = JobEvent.builder()
                 .referenceId(UUID.randomUUID())
@@ -59,41 +54,45 @@ class JobEventListenerTest {
         when(objectMapper.readValue(anyString(), eq(JobEvent.class))).thenReturn(evt);
         when(factory.getStrategy("ISSUE")).thenReturn(strategy);
 
-        listener.handleCreated(record("{}"), ack);
+        listener.handleCreated("{}");
 
         verify(strategy).handle(evt);
-        verify(ack).acknowledge();
     }
 
     @Test
-    @DisplayName("handleCreated skips strategy when action is not JOB_CREATED but still acks")
+    @DisplayName("handleCreated skips strategy when action is not JOB_CREATED")
     void createdWrongAction() throws Exception {
         JobEvent evt = JobEvent.builder()
                 .action(JobAction.JOB_ASSIGNED).build();
 
         when(objectMapper.readValue(anyString(), eq(JobEvent.class))).thenReturn(evt);
 
-        listener.handleCreated(record("{}"), ack);
+        listener.handleCreated("{}");
 
         verify(factory, never()).getStrategy(any());
         verify(strategy, never()).handle(any());
-        verify(ack).acknowledge();
     }
 
     @Test
-    @DisplayName("handleCreated acks poison-pill payload (malformed JSON)")
+    @DisplayName("handleCreated swallows poison-pill payload (malformed JSON) — does not call strategy")
     void createdPoisonPill() throws Exception {
         when(objectMapper.readValue(anyString(), eq(JobEvent.class)))
                 .thenThrow(new JsonProcessingException("boom") {});
 
-        listener.handleCreated(record("not-json"), ack);
+        listener.handleCreated("not-json");
 
-        verify(ack).acknowledge();
         verify(factory, never()).getStrategy(any());
     }
 
     @Test
-    @DisplayName("handleCreated re-throws on unexpected errors (so Kafka retries)")
+    @DisplayName("handleCreated swallows null payload (no work, no NPE)")
+    void createdNullPayload() {
+        listener.handleCreated(null);
+        verifyNoInteractions(factory, strategy);
+    }
+
+    @Test
+    @DisplayName("handleCreated swallows unexpected downstream errors (no retry — strategy failures must not pin the partition)")
     void createdUnexpectedFailure() throws Exception {
         JobEvent evt = JobEvent.builder()
                 .referenceType("ISSUE").action(JobAction.JOB_CREATED).build();
@@ -101,9 +100,9 @@ class JobEventListenerTest {
         when(factory.getStrategy("ISSUE")).thenReturn(strategy);
         org.mockito.Mockito.doThrow(new RuntimeException("downstream")).when(strategy).handle(evt);
 
-        assertThatThrownBy(() -> listener.handleCreated(record("{}"), ack))
-                .isInstanceOf(RuntimeException.class);
-        verify(ack, never()).acknowledge();
+        listener.handleCreated("{}");
+
+        verify(strategy).handle(evt);
     }
 
     @Test

@@ -14,6 +14,7 @@ import com.isums.scheduleservice.domains.events.JobRescheduledEvent;
 import com.isums.scheduleservice.domains.events.JobScheduledEvent;
 import com.isums.scheduleservice.exceptions.BadRequestException;
 import com.isums.scheduleservice.infrastructures.grpcs.HousesClientsGrpc;
+import com.isums.scheduleservice.infrastructures.grpcs.IssueClientGrpc;
 import com.isums.scheduleservice.infrastructures.grpcs.MaintenanceClientsGrpc;
 import com.isums.scheduleservice.infrastructures.grpcs.UserClientsGrpc;
 import com.isums.scheduleservice.infrastructures.kafka.JobEventProducer;
@@ -58,6 +59,7 @@ class WorkSlotServiceImplTest {
     @Mock private HousesClientsGrpc houseClient;
     @Mock private StaffAssignmentService staffAssignmentService;
     @Mock private MaintenanceClientsGrpc maintenanceClient;
+    @Mock private IssueClientGrpc issueClient;
 
     @InjectMocks private WorkSlotServiceImpl service;
 
@@ -565,6 +567,122 @@ class WorkSlotServiceImplTest {
             assertThat(d.slots()).noneMatch(s ->
                     !s.startTime().isBefore(LocalTime.of(12, 0))
                             && s.startTime().isBefore(LocalTime.of(13, 0)));
+        }
+    }
+
+    @Nested
+    @DisplayName("getSlotsByDate (Tạo Ca Làm Mới step 2)")
+    class GetSlotsByDate {
+
+        private final UUID jobId = UUID.randomUUID();
+        private final UUID houseId = UUID.randomUUID();
+        private final UUID regionId = UUID.randomUUID();
+        private final UUID staffId = UUID.randomUUID();
+        private final LocalDate date = nextWorkingMonday();
+
+        @Test
+        @DisplayName("REGRESSION: maintenance throws NOT_FOUND — fallback to issue, slots still returned")
+        void maintenanceFailsFallbackToIssue() {
+            when(maintenanceClient.getHouseByJobId(jobId))
+                    .thenThrow(new RuntimeException(
+                            "Failed to get houseId for jobId: " + jobId + " [NOT_FOUND: Job not found]"));
+            when(issueClient.getHouseByJobId(jobId)).thenReturn(houseId);
+            when(houseClient.getRegionByHouseId(houseId)).thenReturn(regionId);
+            when(houseClient.getStaffIdsByRegion(regionId)).thenReturn(List.of(staffId));
+            when(scheduleTemplateRepository
+                    .findFirstByEffectiveFromLessThanEqualOrderByEffectiveFromDesc(date))
+                    .thenReturn(Optional.of(template));
+            when(workSlotRepository.findOverlappingSlotsForStaffs(any(), any(), any()))
+                    .thenReturn(List.of());
+
+            List<DaySlotDto> result = service.getSlotsByDate(jobId, date);
+
+            assertThat(result).hasSize(1);
+            assertThat(result.get(0).date()).isEqualTo(date);
+            assertThat(result.get(0).slots()).isNotEmpty();
+            verify(maintenanceClient).getHouseByJobId(jobId);
+            verify(issueClient).getHouseByJobId(jobId);
+        }
+
+        @Test
+        @DisplayName("REGRESSION: maintenance UNAVAILABLE (Service Connect down) — falls back to issue")
+        void maintenanceUnavailableFallsBack() {
+            when(maintenanceClient.getHouseByJobId(jobId))
+                    .thenThrow(new RuntimeException(
+                            "Failed to get houseId for jobId: " + jobId + " [UNAVAILABLE: io exception]"));
+            when(issueClient.getHouseByJobId(jobId)).thenReturn(houseId);
+            when(houseClient.getRegionByHouseId(houseId)).thenReturn(regionId);
+            when(houseClient.getStaffIdsByRegion(regionId)).thenReturn(List.of(staffId));
+            when(scheduleTemplateRepository
+                    .findFirstByEffectiveFromLessThanEqualOrderByEffectiveFromDesc(date))
+                    .thenReturn(Optional.of(template));
+            when(workSlotRepository.findOverlappingSlotsForStaffs(any(), any(), any()))
+                    .thenReturn(List.of());
+
+            assertThat(service.getSlotsByDate(jobId, date)).hasSize(1);
+        }
+
+        @Test
+        @DisplayName("REGRESSION: BOTH gRPC fail — error message names both maintenance + issue, NOT just one")
+        void bothFailMentionsBothServices() {
+            when(maintenanceClient.getHouseByJobId(jobId))
+                    .thenThrow(new RuntimeException("Failed to get houseId for jobId: " + jobId + " [NOT_FOUND]"));
+            when(issueClient.getHouseByJobId(jobId))
+                    .thenThrow(new RuntimeException(
+                            "Failed to get houseId for issueId: " + jobId + " [NOT_FOUND]"));
+
+            assertThatThrownBy(() -> service.getSlotsByDate(jobId, date))
+                    .isInstanceOf(RuntimeException.class)
+                    .hasMessageContaining("Can't get slots by date")
+                    .hasMessageContaining("Job not found in both maintenance & issue");
+
+            verify(maintenanceClient).getHouseByJobId(jobId);
+            verify(issueClient).getHouseByJobId(jobId);
+        }
+
+        @Test
+        @DisplayName("houseId resolves but no staff in region — surfaces 'No staff in region' (not gRPC error)")
+        void noStaffInRegion() {
+            when(maintenanceClient.getHouseByJobId(jobId)).thenReturn(houseId);
+            when(houseClient.getRegionByHouseId(houseId)).thenReturn(regionId);
+            when(houseClient.getStaffIdsByRegion(regionId)).thenReturn(List.of());
+
+            assertThatThrownBy(() -> service.getSlotsByDate(jobId, date))
+                    .isInstanceOf(RuntimeException.class)
+                    .hasMessageContaining("Can't get slots by date")
+                    .hasMessageContaining("No staff in region");
+        }
+
+        @Test
+        @DisplayName("error wrapper preserves original cause so logs can show full stack")
+        void wrapperPreservesCause() {
+            RuntimeException grpcErr = new RuntimeException(
+                    "Failed to get houseId for jobId: " + jobId + " [UNAVAILABLE: io exception]");
+            when(maintenanceClient.getHouseByJobId(jobId)).thenThrow(grpcErr);
+            RuntimeException issueErr = new RuntimeException(
+                    "Failed to get houseId for issueId: " + jobId + " [UNAVAILABLE: io exception]");
+            when(issueClient.getHouseByJobId(jobId)).thenThrow(issueErr);
+
+            assertThatThrownBy(() -> service.getSlotsByDate(jobId, date))
+                    .hasCauseInstanceOf(RuntimeException.class);
+        }
+
+        @Test
+        @DisplayName("maintenance happy path — does NOT call issue fallback (saves one gRPC roundtrip)")
+        void maintenanceHappyDoesNotCallIssue() {
+            when(maintenanceClient.getHouseByJobId(jobId)).thenReturn(houseId);
+            when(houseClient.getRegionByHouseId(houseId)).thenReturn(regionId);
+            when(houseClient.getStaffIdsByRegion(regionId)).thenReturn(List.of(staffId));
+            when(scheduleTemplateRepository
+                    .findFirstByEffectiveFromLessThanEqualOrderByEffectiveFromDesc(date))
+                    .thenReturn(Optional.of(template));
+            when(workSlotRepository.findOverlappingSlotsForStaffs(any(), any(), any()))
+                    .thenReturn(List.of());
+
+            service.getSlotsByDate(jobId, date);
+
+            verify(maintenanceClient).getHouseByJobId(jobId);
+            verify(issueClient, never()).getHouseByJobId(any(UUID.class));
         }
     }
 }
