@@ -480,11 +480,15 @@ public class WorkSlotServiceImpl implements WorkSlotService {
 
     @Override
     public List<StaffDto> getAvailableStaff(UUID jobId, LocalDate date, LocalTime startTime) {
-        WorkSlot slot = workSlotRepository.findByJobId(jobId)
-                .orElseThrow(() -> new RuntimeException("Slot not found"));
+        WorkSlot slot = workSlotRepository.findByJobId(jobId).orElse(null);
 
-        if (slot.getStatus() == SlotStatus.BOOKED && slot.getStaffId() != null) {
-            throw new RuntimeException("Slot already has assigned staff");
+        if (slot != null
+                && slot.getStatus() == SlotStatus.BOOKED
+                && slot.getStaffId() != null) {
+            log.warn("[Slots] getAvailableStaff jobId={} already BOOKED to staff={} (status={}), surfacing as 409",
+                    jobId, slot.getStaffId(), slot.getStatus());
+            throw new BadRequestException(
+                    "Công việc này đã được phân ca cho nhân viên rồi. Vui lòng chọn công việc khác hoặc hủy ca cũ trước.");
         }
         UUID houseId = resolveHouseId(jobId);
         UUID regionId = houseClient.getRegionByHouseId(houseId);
