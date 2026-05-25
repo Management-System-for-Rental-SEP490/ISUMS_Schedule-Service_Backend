@@ -1,6 +1,7 @@
 package com.isums.scheduleservice.infrastructures.repositories;
 
 import com.isums.scheduleservice.domains.entities.WorkSlot;
+import com.isums.scheduleservice.domains.enums.JobType;
 import com.isums.scheduleservice.domains.enums.SlotStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -28,6 +29,7 @@ public interface WorkSlotRepository extends JpaRepository<WorkSlot, UUID> {
     List<WorkSlot> findOverlappingSlots(UUID staffId, LocalDateTime start, LocalDateTime end);
     List<WorkSlot> findByStaffIdOrderByStartTimeAsc(UUID staffId);
     List<WorkSlot> findByJobIdAndStatus(UUID jobId, SlotStatus status);
+    List<WorkSlot> findByJobTypeAndStatusAndStaffIdIsNotNull(JobType jobType, SlotStatus status);
 
     @Query("""
     SELECT w FROM WorkSlot w

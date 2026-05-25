@@ -645,5 +645,34 @@ public class WorkSlotServiceImpl implements WorkSlotService {
             }
         }
     }
+
+    @Override
+    public int republishInspectionScheduled() {
+        List<WorkSlot> slots = workSlotRepository
+                .findByJobTypeAndStatusAndStaffIdIsNotNull(JobType.INSPECTION, SlotStatus.BOOKED);
+        log.info("[Backfill] republishInspectionScheduled found {} INSPECTION+BOOKED slots", slots.size());
+        int published = 0;
+        for (WorkSlot s : slots) {
+            try {
+                JobScheduledEvent ev = new JobScheduledEvent();
+                ev.setReferenceId(s.getJobId());
+                ev.setSlotId(s.getId());
+                ev.setStaffId(s.getStaffId());
+                ev.setReferenceType("INSPECTION");
+                ev.setAction(JobAction.JOB_SCHEDULED);
+                ev.setStartTime(s.getStartTime());
+                ev.setEndTime(s.getEndTime());
+                jobEventProducer.publishJobScheduled(ev);
+                published++;
+                log.info("[Backfill] republished jobId={} slotId={} staffId={}",
+                        s.getJobId(), s.getId(), s.getStaffId());
+            } catch (Exception e) {
+                log.error("[Backfill] failed jobId={} slotId={}: {}",
+                        s.getJobId(), s.getId(), e.getMessage(), e);
+            }
+        }
+        log.info("[Backfill] republishInspectionScheduled published {}/{}", published, slots.size());
+        return published;
+    }
 }
 

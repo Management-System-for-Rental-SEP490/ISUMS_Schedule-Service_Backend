@@ -93,4 +93,9 @@ public class WorkSlotController {
         return ApiResponses.ok(res, "Get my slots");
     }
 
+    @PostMapping("/admin/republish-inspection-scheduled")
+    public ApiResponse<Integer> republishInspectionScheduled() {
+        int published = workSlotService.republishInspectionScheduled();
+        return ApiResponses.ok(published, "Republished " + published + " job.scheduled events for BOOKED inspection slots");
+    }
 }

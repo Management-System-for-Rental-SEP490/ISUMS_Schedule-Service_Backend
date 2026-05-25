@@ -23,4 +23,5 @@ public interface WorkSlotService {
     List<DaySlotDto> getSlotsByDate(UUID jobId, LocalDate date);
     List<StaffDto> getAvailableStaff(UUID jobId, LocalDate date, LocalTime startTime);
     List<DaySlotDto> getMyAvailableSlotsRange(String staffId, LocalDate start, LocalDate end);
+    int republishInspectionScheduled();
 }
