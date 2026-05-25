@@ -24,6 +24,7 @@ import com.isums.scheduleservice.infrastructures.repositories.ScheduleTemplateRe
 import com.isums.scheduleservice.infrastructures.repositories.WorkSlotRepository;
 import com.isums.userservice.grpc.UserResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,6 +32,7 @@ import java.time.*;
 import java.util.*;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Transactional
 @Service
 @RequiredArgsConstructor
@@ -408,7 +410,7 @@ public class WorkSlotServiceImpl implements WorkSlotService {
     @Override
     public List<DaySlotDto> getSlotsByDate(UUID jobId, LocalDate date) {
         try {
-            UUID houseId = maintenanceClient.getHouseByJobId(jobId);
+            UUID houseId = resolveHouseId(jobId);
             UUID regionId = houseClient.getRegionByHouseId(houseId);
             List<UUID> staffIds = houseClient.getStaffIdsByRegion(regionId);
 
@@ -471,6 +473,7 @@ public class WorkSlotServiceImpl implements WorkSlotService {
             return List.of(new DaySlotDto(date, slots));
 
         } catch (Exception ex) {
+            log.error("[Slots] getSlotsByDate failed jobId={} date={}", jobId, date, ex);
             throw new RuntimeException("Can't get slots by date: " + ex.getMessage(), ex);
         }
     }
