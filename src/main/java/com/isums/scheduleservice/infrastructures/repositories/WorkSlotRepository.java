@@ -21,7 +21,10 @@ public interface WorkSlotRepository extends JpaRepository<WorkSlot, UUID> {
         com.isums.scheduleservice.domains.enums.SlotStatus.PENDING,
         com.isums.scheduleservice.domains.enums.SlotStatus.BOOKED,
         com.isums.scheduleservice.domains.enums.SlotStatus.NEED_RESCHEDULE,
-        com.isums.scheduleservice.domains.enums.SlotStatus.WAITING_MANAGER_CONFIRM
+        com.isums.scheduleservice.domains.enums.SlotStatus.WAITING_MANAGER_CONFIRM,
+        com.isums.scheduleservice.domains.enums.SlotStatus.CONFIRMED,
+        com.isums.scheduleservice.domains.enums.SlotStatus.BLOCKED,
+        com.isums.scheduleservice.domains.enums.SlotStatus.DONE
     )
     AND w.startTime < :end
     AND w.endTime > :start
@@ -88,7 +91,10 @@ public interface WorkSlotRepository extends JpaRepository<WorkSlot, UUID> {
         com.isums.scheduleservice.domains.enums.SlotStatus.PENDING,
         com.isums.scheduleservice.domains.enums.SlotStatus.BOOKED,
         com.isums.scheduleservice.domains.enums.SlotStatus.NEED_RESCHEDULE,
-        com.isums.scheduleservice.domains.enums.SlotStatus.WAITING_MANAGER_CONFIRM
+        com.isums.scheduleservice.domains.enums.SlotStatus.WAITING_MANAGER_CONFIRM,
+        com.isums.scheduleservice.domains.enums.SlotStatus.CONFIRMED,
+        com.isums.scheduleservice.domains.enums.SlotStatus.BLOCKED,
+        com.isums.scheduleservice.domains.enums.SlotStatus.DONE
     )
     AND w.startTime < :end
     AND w.endTime > :start
@@ -103,6 +109,8 @@ public interface WorkSlotRepository extends JpaRepository<WorkSlot, UUID> {
         com.isums.scheduleservice.domains.enums.SlotStatus.BOOKED,
         com.isums.scheduleservice.domains.enums.SlotStatus.NEED_RESCHEDULE,
         com.isums.scheduleservice.domains.enums.SlotStatus.WAITING_MANAGER_CONFIRM,
+        com.isums.scheduleservice.domains.enums.SlotStatus.CONFIRMED,
+        com.isums.scheduleservice.domains.enums.SlotStatus.BLOCKED,
         com.isums.scheduleservice.domains.enums.SlotStatus.DONE
         )
     AND w.startTime < :end

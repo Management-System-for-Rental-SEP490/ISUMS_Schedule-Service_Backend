@@ -252,12 +252,41 @@ class WorkSlotServiceImplTest {
             when(workSlotRepository.findByJobId(jobId)).thenReturn(Optional.of(slot));
             when(scheduleTemplateRepository.findFirstByEffectiveFromLessThanEqualOrderByEffectiveFromDesc(any()))
                     .thenReturn(Optional.of(template));
+            when(workSlotRepository.findOverlappingSlots(slot.getStaffId(), startTime, startTime.plusHours(1)))
+                    .thenReturn(List.of());
             when(workSlotRepository.save(slot)).thenReturn(slot);
 
             service.staffConfirmTime(new ConfirmSlotRequest(jobId, startTime));
 
             assertThat(slot.getStatus()).isEqualTo(SlotStatus.WAITING_MANAGER_CONFIRM);
             verify(jobEventProducer).publishJobWaitingConfirm(any(JobEvent.class));
+        }
+
+        @Test
+        @DisplayName("rejects when selected time overlaps another slot of the same staff")
+        void rejectsStaffConflict() {
+            UUID jobId = UUID.randomUUID();
+            UUID staffId = UUID.randomUUID();
+            WorkSlot slot = WorkSlot.builder()
+                    .id(UUID.randomUUID()).jobId(jobId)
+                    .staffId(staffId)
+                    .jobType(JobType.ISSUE).status(SlotStatus.PENDING).build();
+            WorkSlot existing = WorkSlot.builder()
+                    .id(UUID.randomUUID()).staffId(staffId)
+                    .status(SlotStatus.DONE)
+                    .startTime(startTime).endTime(startTime.plusHours(1)).build();
+
+            when(workSlotRepository.findByJobId(jobId)).thenReturn(Optional.of(slot));
+            when(scheduleTemplateRepository.findFirstByEffectiveFromLessThanEqualOrderByEffectiveFromDesc(any()))
+                    .thenReturn(Optional.of(template));
+            when(workSlotRepository.findOverlappingSlots(staffId, startTime, startTime.plusHours(1)))
+                    .thenReturn(List.of(existing));
+
+            assertThatThrownBy(() -> service.staffConfirmTime(new ConfirmSlotRequest(jobId, startTime)))
+                    .isInstanceOf(RuntimeException.class)
+                    .hasMessageContaining("Staff already has schedule");
+            verify(workSlotRepository, never()).save(any());
+            verify(jobEventProducer, never()).publishJobWaitingConfirm(any());
         }
 
         @Test
@@ -460,8 +489,8 @@ class WorkSlotServiceImplTest {
         }
 
         @Test
-        @DisplayName("does NOT publish JOB_COMPLETED for non-INSPECTION job types")
-        void issueDoneNoEvent() {
+        @DisplayName("publishes JOB_COMPLETED for ISSUE job types")
+        void issueDonePublishesEvent() {
             UUID slotId = UUID.randomUUID();
             WorkSlot slot = WorkSlot.builder()
                     .id(slotId).jobType(JobType.ISSUE).status(SlotStatus.BOOKED).build();
@@ -471,7 +500,7 @@ class WorkSlotServiceImplTest {
             service.markSlotDone(JobEvent.builder().slotId(slotId).build());
 
             assertThat(slot.getStatus()).isEqualTo(SlotStatus.DONE);
-            verify(jobEventProducer, never()).publishJobCompleted(any());
+            verify(jobEventProducer).publishJobCompleted(any(JobEvent.class));
         }
 
         @Test

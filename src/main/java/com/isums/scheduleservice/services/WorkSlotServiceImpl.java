@@ -37,6 +37,8 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class WorkSlotServiceImpl implements WorkSlotService {
+    private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
+
     private final WorkSlotRepository workSlotRepository;
     private final ScheduleTemplateRepository scheduleTemplateRepository;
     private final ScheduleMapper scheduleMapper;
@@ -70,6 +72,7 @@ public class WorkSlotServiceImpl implements WorkSlotService {
             LocalDateTime endTime = req.startTime().plusMinutes(template.getSlotMinutes());
 
             validateWorkingHours(req.startTime(), endTime, template);
+            validateFutureSlot(req.startTime());
 
             List<WorkSlot> conflicts = workSlotRepository.findOverlappingSlots(
                     req.staffId(),
@@ -152,6 +155,7 @@ public class WorkSlotServiceImpl implements WorkSlotService {
             LocalDateTime endTime = req.startTime().plusMinutes(template.getSlotMinutes());
 
             validateWorkingHours(req.startTime(), endTime, template);
+            validateFutureSlot(req.startTime());
 
             UUID staffId = staffAssignmentService.pickStaff(staffIds, regionId, req.startTime(), endTime);
 
@@ -214,6 +218,19 @@ public class WorkSlotServiceImpl implements WorkSlotService {
 
             LocalDateTime endTime = req.startTime().plusMinutes(template.getSlotMinutes());
             validateWorkingHours(req.startTime(),endTime,template);
+            validateFutureSlot(req.startTime());
+
+            List<WorkSlot> conflicts = workSlotRepository.findOverlappingSlots(
+                    slot.getStaffId(),
+                    req.startTime(),
+                    endTime
+            ).stream()
+                    .filter(conflict -> !Objects.equals(conflict.getId(), slot.getId()))
+                    .toList();
+
+            if (!conflicts.isEmpty()) {
+                throw new RuntimeException("Staff already has schedule in this time");
+            }
 
             slot.setStartTime(req.startTime());
             slot.setEndTime(endTime);
@@ -326,6 +343,7 @@ public class WorkSlotServiceImpl implements WorkSlotService {
 
             LocalDateTime endTime = request.newStartTime().plusMinutes(template.getSlotMinutes());
             validateWorkingHours(request.newStartTime(),endTime,template);
+            validateFutureSlot(request.newStartTime());
 
             List<WorkSlot> conflicts = workSlotRepository.findOverlappingSlots(request.newStaffId(), request.newStartTime(), endTime);
 
@@ -426,6 +444,7 @@ public class WorkSlotServiceImpl implements WorkSlotService {
 
             LocalDateTime startDay = date.atTime(template.getOpenTime());
             LocalDateTime endDay = date.atTime(template.getCloseTime());
+            LocalDateTime now = LocalDateTime.now(BUSINESS_ZONE);
 
             List<WorkSlot> busySlots = workSlotRepository.findOverlappingSlotsForStaffs(staffIds, startDay, endDay );
 
@@ -459,12 +478,13 @@ public class WorkSlotServiceImpl implements WorkSlotService {
                         .collect(Collectors.toSet());
 
                 int available = totalStaff - busyStaff.size();
+                boolean isPastSlot = !slotStart.isAfter(now);
 
                 slots.add(new SlotsAvailableDto(
                         cur.toLocalTime(),
                         slotEnd.toLocalTime(),
-                        available > 0 ? "AVAILABLE" : "UNAVAILABLE",
-                        available
+                        !isPastSlot && available > 0 ? "AVAILABLE" : "UNAVAILABLE",
+                        isPastSlot ? 0 : available
                 ));
 
                 cur = slotEnd.plusMinutes(template.getBufferMinutes());
@@ -570,6 +590,7 @@ public class WorkSlotServiceImpl implements WorkSlotService {
 
                 LocalDateTime cur = date.atTime(template.getOpenTime());
                 LocalDateTime endDay = date.atTime(template.getCloseTime());
+                LocalDateTime now = LocalDateTime.now(BUSINESS_ZONE);
 
                 List<SlotsAvailableDto> slots = new ArrayList<>();
 
@@ -592,12 +613,13 @@ public class WorkSlotServiceImpl implements WorkSlotService {
                     boolean isBusy = busyMap
                             .getOrDefault(date, Set.of())
                             .contains(cur.toLocalTime());
+                    boolean isPastSlot = !cur.isAfter(now);
 
                     slots.add(new SlotsAvailableDto(
                             cur.toLocalTime(),
                             slotEnd.toLocalTime(),
-                            isBusy ? "UNAVAILABLE" : "AVAILABLE",
-                            isBusy ? 0 : 1
+                            !isBusy && !isPastSlot ? "AVAILABLE" : "UNAVAILABLE",
+                            isBusy || isPastSlot ? 0 : 1
                     ));
 
                     cur = slotEnd.plusMinutes(template.getBufferMinutes());
@@ -631,6 +653,12 @@ public class WorkSlotServiceImpl implements WorkSlotService {
         }
         if(!isMorning && !isAfternoon){
             throw new RuntimeException("Outside working hours");
+        }
+    }
+
+    private void validateFutureSlot(LocalDateTime start) {
+        if (!start.isAfter(LocalDateTime.now(BUSINESS_ZONE))) {
+            throw new RuntimeException("Cannot book a past slot");
         }
     }
 
