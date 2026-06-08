@@ -331,6 +331,16 @@ public class WorkSlotServiceImpl implements WorkSlotService {
     }
 
     @Override
+    public List<WorkSlotDto> getSlotsByIds(List<UUID> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return java.util.List.of();
+        }
+        return workSlotRepository.findAllById(ids).stream()
+                .map(scheduleMapper::slot)
+                .toList();
+    }
+
+    @Override
     public WorkSlotDto rescheduleSlot(RescheduleSlotRequest request) {
         try{
             WorkSlot oldSlot = workSlotRepository.findByJobIdAndStatus(request.jobId(),SlotStatus.NEED_RESCHEDULE)

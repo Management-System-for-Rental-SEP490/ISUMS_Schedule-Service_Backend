@@ -63,6 +63,12 @@ public class WorkSlotController {
         return ApiResponses.ok(res,"Get slots by id successfully");
     }
 
+    @GetMapping("/batch")
+    public ApiResponse<List<WorkSlotDto>> getSlotsByIds(@RequestParam List<UUID> ids){
+        List<WorkSlotDto> res = workSlotService.getSlotsByIds(ids);
+        return ApiResponses.ok(res,"Get slots by ids successfully");
+    }
+
     @PutMapping("/{slotId}/cancel")
     public ApiResponse<Boolean> cancelSlot(@PathVariable UUID slotId){
         Boolean res = workSlotService.cancelSlot(slotId);

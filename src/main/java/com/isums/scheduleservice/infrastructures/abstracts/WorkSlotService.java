@@ -17,6 +17,7 @@ public interface WorkSlotService {
     List<WorkSlotDto> getSlotsByStaffId(String staffId);
     Boolean cancelSlot(UUID slotId);
     WorkSlotDto getSlotById(UUID workSlotId);
+    List<WorkSlotDto> getSlotsByIds(List<UUID> ids);
     WorkSlotDto rescheduleSlot(RescheduleSlotRequest request);
     List<WorkSlotDto> getSlotsByRange(LocalDate start,LocalDate end);
     void markSlotDone(JobEvent event);
